@@ -1,0 +1,37 @@
+<html>
+<head>
+<title>LED Strip simulation</title>
+    <script type="text/javascript" src="pixastic/pixastic.core.js"></script>
+    <script type="text/javascript" src="pixastic/actions/brightness.js"></script>
+    <script type='text/javascript'>
+        var img = document.getElementById("image"); // get the image element
+
+//        if (img.complete) {	// make sure the image is fully loaded
+            var newimg = Pixastic.process(
+                    img,
+                    "brightness",	// brightness/contrast adjustment
+
+                    {		// options object
+
+                        "brightness" : 60,	// set brightness option value to 60
+                        "contrast" : 0.5,	// set contrast option value to 0.5,
+                        "rect" : {		// apply the effect to this region only
+                            "left" : 100,
+                            "right" : 100,
+                            "width" : 200,
+                            "height" : 150
+                        }
+                    }
+            );
+//        }
+    </script>
+</head>
+
+<body>
+foo
+
+<img id="image" src="bluegreen240.png"/>
+
+
+</body>
+</html>
