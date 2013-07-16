@@ -8,8 +8,6 @@ void setup()
   pinMode(redPin, OUTPUT); 
   pinMode(grnPin, OUTPUT); 
   pinMode(bluPin, OUTPUT);  
-  pinMode(5, OUTPUT);  
-  digitalWrite(5, 1);
   Serial.begin(9600);
 }
 

@@ -8,29 +8,23 @@ void setup()
   pinMode(redPin, OUTPUT); 
   pinMode(grnPin, OUTPUT); 
   pinMode(bluPin, OUTPUT);  
-  pinMode(5, OUTPUT);  
-  digitalWrite(5, 1);
   Serial.begin(9600);
 }
 
 void loop()       
 {
-  int time = 800;
+  int time = 300;
   
   // red to green
   fadeTo(255, 0, 0, 0, 255, 0, time); 
   // green to white
   fadeTo(0, 255, 0, 255, 255, 255, time); 
-  fadeTo(255, 255, 255, 255, 255, 255, time); 
   // white to green
   fadeTo(255, 255, 255, 0, 255, 0, time); 
-  fadeTo(0, 255, 0, 0, 255, 0, time); 
   // green to black
   fadeTo(0, 255, 0, 0, 0, 0, time); 
-  fadeTo(0, 0, 0, 0, 0, 0, time); 
   // black to green
   fadeTo(0, 0, 0, 0, 255, 0, time); 
-  fadeTo(0, 255, 0, 0, 255, 0, time); 
   
   // g to b
   fadeTo(0, 255, 0, 0, 0, 255, time); 

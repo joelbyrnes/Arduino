@@ -1,7 +1,7 @@
 
-int redPin = 4;
-int grnPin = 5;
-int bluPin = 6;
+int redPin = 2;
+int grnPin = 3;
+int bluPin = 4;
 
 int waitTime = 200;
 
