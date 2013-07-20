@@ -1,2 +1,13 @@
-FastSPI_LED2
-
+FastSPI_LED2/
+Adafruit_NeoPixel/
+ArduinoSerialCommand/
+BlinkyTape_Arduino
+MAX6675/
+NewSoftSerial/
+SoftwareServo/
+Tlc5940/
+XBee/
+adafruitMAX6675/
+bitlash2pt0RC4/
+bma180/
+jeelib/

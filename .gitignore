@@ -1,2 +1,5 @@
 *.o
 .svn
+.DS_Store
+.idea/
+
