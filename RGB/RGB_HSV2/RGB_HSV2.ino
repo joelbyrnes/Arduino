@@ -41,9 +41,9 @@ void setup() {
 
 void loop() {
   //The Hue value will vary from 0 to 360, which represents degrees in the color wheel
-  for(int hue=0;hue<360;hue++)
+  for(double hue=0;hue<360.; hue += 0.1)
   {
-    setLedColorHSV(hue,1,1); //We are using Saturation and Value constant at 1
+    setLedColorHSV(hue,1.,1.); //We are using Saturation and Value constant at 1
     delay(1); 
   }
 }
@@ -53,7 +53,7 @@ void loop() {
 //  s is saturation value, double between 0 and 1
 //  v is value, double between 0 and 1
 //http://splinter.com.au/blog/?p=29
-void setLedColorHSV(int h, double s, double v) {
+void setLedColorHSV(double h, double s, double v) {
   //this is the algorithm to convert from RGB to HSV
   double r=0; 
   double g=0; 

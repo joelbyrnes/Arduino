@@ -1,15 +1,10 @@
 
-#define POT_PIN A0
+#define HUE_PIN A0
+#define LIGHT_PIN A1
 
-int rpin = 9;
-int gpin = 10;
-int bpin = 11;
-float h;
-int h_int;
-int r=0, g=0, b=0;
-
-int val=0;
-
+int redPin = 9;
+int grnPin = 10;
+int bluPin = 11;
 
 // Define the number of samples to keep track of.  The higher the number,
 // the more the readings will be smoothed, but the slower the output will
@@ -17,122 +12,156 @@ int val=0;
 // use this value to determine the size of the readings array.
 const int numSamples = 32;
 
-int readings[numSamples];      // the readings from the analog input
-int index = 0;                  // the index of the current reading
-int total = 0;                  // the running total
-
-
-//void h2rgb(float h, int &R, int &G, int &B);
-
-
+int h_readings[numSamples];      // the readings from the analog input
+int h_index = 0;                  // the index of the current reading
+int h_total = 0;                  // the running total
+int l_readings[numSamples];      // the readings from the analog input
+int l_index = 0;                  // the index of the current reading
+int l_total = 0;                  // the running total
 
 void setup()                    // run once, when the sketch starts
 {
+  pinMode(redPin, OUTPUT);  
+  pinMode(grnPin, OUTPUT);  
+  pinMode(bluPin, OUTPUT);  
+  
   Serial.begin(115200);          
   
   // initialise array to avoid wacky values
   for (int i=0; i < numSamples; i++) {
-    averagedRead();
+    averagedHue();
+    averagedLight();
   }
 }
 
+double h=0.0, s=1.0, l=0.5;
 
-void loop()                     // run over and over again
-{
-  val=averagedRead();    // Read the pin and display the value
-  //Serial.println(val);
-  h = ((float)val)/1024;
-  h_int = (int) 360*h;
-  h2rgb(h,r,g,b);
-  Serial.print("Smoothed value: ");
-  Serial.print(val);
-  Serial.print(" = Hue of ");
-  Serial.print(h_int);
-  Serial.print("degrees. RGB: ");
-  Serial.print(r);
+void loop() {
+  int avgHue = averagedHue();    // Read the pin and display the value
+  int avgLight = averagedLight();    // Read the pin and display the value
+  Serial.println(avgHue);
+  Serial.println(avgLight);
+
+  h = 360. * ((double) avgHue)/1024.;
+  l = ((double) avgLight)/1024.;
+  
+  Serial.print(h);
   Serial.print(" ");
-  Serial.print(g);
+  Serial.print(s);
   Serial.print(" ");
-  Serial.println(b);
-
-  analogWrite(rpin, r);
-  analogWrite(gpin, g);
-  analogWrite(bpin, b);
+  Serial.println(l);
+  setHSLColour(h, s, l);
 }
 
-void h2rgb(float H, int& R, int& G, int& B) {
-
-  int var_i;
-  float S=1, V=1, var_1, var_2, var_3, var_h, var_r, var_g, var_b;
-
-  if ( S == 0 )                       //HSV values = 0 ÷ 1
-  {
-    R = V * 255;
-    G = V * 255;
-    B = V * 255;
-  }
-  else
-  {
-    var_h = H * 6;
-    if ( var_h == 6 ) var_h = 0;      //H must be < 1
-    var_i = int( var_h ) ;            //Or ... var_i = floor( var_h )
-    var_1 = V * ( 1 - S );
-    var_2 = V * ( 1 - S * ( var_h - var_i ) );
-    var_3 = V * ( 1 - S * ( 1 - ( var_h - var_i ) ) );
-
-    if      ( var_i == 0 ) { 
-      var_r = V     ; 
-      var_g = var_3 ; 
-      var_b = var_1 ;
-    }
-    else if ( var_i == 1 ) { 
-      var_r = var_2 ; 
-      var_g = V     ; 
-      var_b = var_1 ;
-    }
-    else if ( var_i == 2 ) { 
-      var_r = var_1 ; 
-      var_g = V     ; 
-      var_b = var_3 ;
-    }
-    else if ( var_i == 3 ) { 
-      var_r = var_1 ; 
-      var_g = var_2 ; 
-      var_b = V     ;
-    }
-    else if ( var_i == 4 ) { 
-      var_r = var_3 ; 
-      var_g = var_1 ; 
-      var_b = V     ;
-    }
-    else                   { 
-      var_r = V     ; 
-      var_g = var_1 ; 
-      var_b = var_2 ;
-    }
-
-    R = (1-var_r) * 255;                  //RGB results = 0 ÷ 255
-    G = (1-var_g) * 255;
-    B = (1-var_b) * 255;
-  }
-}
-
-int averagedRead() {
+int averagedHue() {
   // subtract the last reading:
-  total= total - readings[index];         
+  h_total = h_total - h_readings[h_index];         
   // read from the sensor:  
-  readings[index] = analogRead(POT_PIN); 
+  h_readings[h_index] = analogRead(HUE_PIN); 
   // add the reading to the total:
-  total= total + readings[index];       
-  // advance to the next position in the array:  
-  index = index + 1;                    
+  h_total = h_total + h_readings[h_index++];       
 
-  // if we're at the end of the array...
-  if (index >= numSamples)              
-    // ...wrap around to the beginning: 
-    index = 0;                           
+  // if we're at the end of the array, restart
+  if (h_index >= numSamples) h_index = 0;                           
 
   // calculate the average:
-  return total / numSamples;
+  return h_total / numSamples;
+}
+
+int averagedLight() {
+  // subtract the last reading:
+  l_total = l_total - l_readings[l_index];         
+  // read from the sensor:  
+  l_readings[l_index] = analogRead(LIGHT_PIN); 
+  // add the reading to the total:
+  l_total = l_total + l_readings[l_index++];       
+
+  // if we're at the end of the array, restart
+  if (l_index >= numSamples) l_index = 0;                           
+
+  // calculate the average:
+  return l_total / numSamples;
+}
+
+// https://gist.github.com/xpansive/1337890
+void setHSLColour(double hue, double sat, double light) {
+  sat *= light <.5? light : 1-light;
+ 
+  double v = light+sat;
+  //setHSVColour(hue, 2*sat/v, v);
+  setLedColorHSV(hue, 2*sat/v, v);
+}
+
+void colour(byte red, byte grn, byte blu) {
+  analogWrite(redPin, red);
+  analogWrite(grnPin, grn);
+  analogWrite(bluPin, blu);
+}
+
+/*
+ * Created 1 January 2011
+ * By Eduardo A. Flores Verduzco
+ * http://eduardofv.com
+ */
+ 
+//Convert a given HSV (Hue Saturation Value) to RGB(Red Green Blue) and set the led to the color
+//  h is hue value, integer between 0 and 360
+//  s is saturation value, double between 0 and 1
+//  v is value, double between 0 and 1
+//http://splinter.com.au/blog/?p=29
+void setLedColorHSV(double h, double s, double v) {
+  //this is the algorithm to convert from RGB to HSV
+  double r=0; 
+  double g=0; 
+  double b=0;
+
+  double hf=h/60.0;
+
+  int i=(int)floor(h/60.0);
+  double f = h/60.0 - i;
+  double pv = v * (1 - s);
+  double qv = v * (1 - s*f);
+  double tv = v * (1 - s * (1 - f));
+
+  switch (i)
+  {
+  case 0: //rojo dominante
+    r = v;
+    g = tv;
+    b = pv;
+    break;
+  case 1: //verde
+    r = qv;
+    g = v;
+    b = pv;
+    break;
+  case 2: 
+    r = pv;
+    g = v;
+    b = tv;
+    break;
+  case 3: //azul
+    r = pv;
+    g = qv;
+    b = v;
+    break;
+  case 4:
+    r = tv;
+    g = pv;
+    b = v;
+    break;
+  case 5: //rojo
+    r = v;
+    g = pv;
+    b = qv;
+    break;
+  }
+
+  //set each component to a integer value between 0 and 255
+  byte red = constrain((int) 255 * r, 0, 255);
+  byte green = constrain((int) 255 * g, 0, 255);
+  int blue = constrain((int) 255 * b, 0, 255);
+
+  colour(red,green,blue);
 }
 

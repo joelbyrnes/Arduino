@@ -10,7 +10,6 @@
 #define DELAY    20
 #define HUE_MAX  6.0
 #define HUE_DELTA 0.3
-
  
 //long deltas[3] = { 5, 6, 7 };
 long rgb[3];
