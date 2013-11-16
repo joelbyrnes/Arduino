@@ -1,4 +1,4 @@
-// - - - - -
+  // - - - - -
 // DmxSerialRecv.pde: Sample DMX application for retrieving 3 DMX values:
 //
 // address 1 (green)  -> PWM Port 9
@@ -17,17 +17,19 @@
 // 28.12.2011 changed to channels 1..3 (RGB) for compatibility with the DmxSerialSend sample.
 // 10.05.2012 added some lines to loop to show how to fall back to a default color when no data was received since some time.
 // 30.04.2013  removed Yellow to act like a simple 3-channel DMX light and moved writes to bottom of loop() <ethan.dicks@gmail.com>
-// 
+//
 // - - - - -
- 
-#include <DMXSerial.h>
- 
-// Constants for demo program
- 
-const int GreenPin  =  9;  // PWM output pin for Green Light.
-const int BluePin   = 10;  // PWM output pin for Blue Light.
-const int RedPin    = 11;  // PWM output pin for Red Light.
- 
+
+//#include <DMXSerial.h>
+#include "FastSPI_LED2.h"
+
+#define CONTROL_PIN 11
+
+#define NUM_LEDS 180
+#define USE_LEDS 180
+
+struct CRGB leds[NUM_LEDS];
+
 #define GreenDefaultLevel 0
 #define BlueDefaultLevel  0
 #define RedDefaultLevel  80
@@ -35,20 +37,32 @@ const int RedPin    = 11;  // PWM output pin for Red Light.
 int GreenValue  = GreenDefaultLevel;
 int BlueValue   = BlueDefaultLevel;
 int RedValue    = RedDefaultLevel;
- 
-void setup ()
-{
+
+void setup() {
+  // sanity check delay - allows reprogramming if accidently blowing power w/leds
+  delay(500);
+
+  // For safety (to prevent too high of a power draw), the test case defaults to
+  // setting brightness to 25% brightness
+  
+  LEDS.setBrightness(255);
+
+  LEDS.addLeds<WS2811, CONTROL_PIN, GRB>(leds, NUM_LEDS);
+   
+  LEDS.clear();
+  
+  // load with nice blue
+  for (int i = 0; i < USE_LEDS; i++) {
+    leds[i] = CRGB(0, 8, 16);  
+  }
+  LEDS.show();
+  
   DMXSerial.init(DMXReceiver);
  
   // set some default values
   DMXSerial.write(1, GreenDefaultLevel);
   DMXSerial.write(2, BlueDefaultLevel);
   DMXSerial.write(3, RedDefaultLevel);
-   
-  // enable pwm outputs
-  pinMode(GreenPin,  OUTPUT); // sets the digital pin as output
-  pinMode(BluePin,  OUTPUT);
-  pinMode(RedPin,   OUTPUT);
 }
  
 void loop()
@@ -69,8 +83,8 @@ void loop()
     RedValue    = RedDefaultLevel;
   }
  
-  analogWrite(GreenPin,  GreenValue);
-  analogWrite(BluePin,   BlueValue);
-  analogWrite(RedPin,    RedValue);
+//  analogWrite(GreenPin,  GreenValue);
+//  analogWrite(BluePin,   BlueValue);
+//  analogWrite(RedPin,    RedValue);
    
 }
