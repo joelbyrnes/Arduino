@@ -20,8 +20,9 @@
 //
 // - - - - -
 
-//#include <DMXSerial.h>
 #include "FastSPI_LED2.h"
+// the DMXSerial include must be AFTER FastSPI_LED2, so the latter include doesn't see it and define things which interfere in dmx.h.
+#include <DMXSerial.h>
 
 #define CONTROL_PIN 11
 
@@ -45,17 +46,14 @@ void setup() {
   // For safety (to prevent too high of a power draw), the test case defaults to
   // setting brightness to 25% brightness
   
-  LEDS.setBrightness(255);
+  LEDS.setBrightness(64);
 
   LEDS.addLeds<WS2811, CONTROL_PIN, GRB>(leds, NUM_LEDS);
    
   LEDS.clear();
   
   // load with nice blue
-  for (int i = 0; i < USE_LEDS; i++) {
-    leds[i] = CRGB(0, 8, 16);  
-  }
-  LEDS.show();
+  LEDS.showColor(CRGB(0, 8, 16));
   
   DMXSerial.init(DMXReceiver);
  
@@ -75,6 +73,8 @@ void loop()
     GreenValue  = DMXSerial.read(1);
     BlueValue   = DMXSerial.read(2);
     RedValue    = DMXSerial.read(3);
+
+    LEDS.showColor(CRGB(RedValue, GreenValue, BlueValue));
   }
   else {
     // Show pure red color, when no data was received since 5 seconds or more.
@@ -82,6 +82,7 @@ void loop()
     BlueValue   = BlueDefaultLevel;
     RedValue    = RedDefaultLevel;
   }
+  
  
 //  analogWrite(GreenPin,  GreenValue);
 //  analogWrite(BluePin,   BlueValue);

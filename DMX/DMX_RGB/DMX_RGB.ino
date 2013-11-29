@@ -24,13 +24,13 @@
  
 // Constants for demo program
  
-const int GreenPin  =  9;  // PWM output pin for Green Light.
-const int BluePin   = 10;  // PWM output pin for Blue Light.
-const int RedPin    = 11;  // PWM output pin for Red Light.
+const int RedPin    = 9;  // PWM output pin for Red Light.
+const int GreenPin  = 10;  // PWM output pin for Green Light.
+const int BluePin   = 11;  // PWM output pin for Blue Light.
  
-#define GreenDefaultLevel 0
-#define BlueDefaultLevel  0
-#define RedDefaultLevel  80
+#define GreenDefaultLevel 255
+#define BlueDefaultLevel  255
+#define RedDefaultLevel   255
  
 int GreenValue  = GreenDefaultLevel;
 int BlueValue   = BlueDefaultLevel;
@@ -50,7 +50,7 @@ void setup ()
   pinMode(BluePin,  OUTPUT);
   pinMode(RedPin,   OUTPUT);
 }
- 
+
 void loop()
 {
   // Calculate how long no data packet was received
