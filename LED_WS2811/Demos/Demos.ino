@@ -1,26 +1,28 @@
-/*
-### teldredge
-### www.funkboxing.com
-### teldredge1979@gmail.com
-
-### FAST_SPI2 LED FX EXAMPLES
-### MOSTLY DESIGNED FOR A LOOP/RING OF LEDS (ORIGINALLY FOR A SIGN)
-### BUT PLENTY USEFUL FOR A LINEAR STRIP TOO
-
-### NOTES:
-### - THIS IS REALLY AN EXAMPLE LIBRARY MORE THAN A MODULE OR ANYTHING, MEANING YOU'LL PROBABLY HAVE TO CUT AND PASTE
-### - SO FAR TESTED WITH WS2801 AND WS2811 USING ARDUINO NANO 328
-### - USES THE 'SERIALCOMMAND' LIBRARY TO CHANGE 'MODES', BUT THESE FXNS COULD BE LOOPED ANYWAY YOU WANT
-
-### LICENSE:::USE FOR WHATEVER YOU WANT, WHENEVER YOU WANT, WHYEVER YOU WANT
+/*------------------------------------#
+#----- FASTSPI2 EFFECTS EXAMPLES -----#
+#-------------- v0.51 ----------------#
+#------------ teldredge --------------#
+#-------- www.funkboxing.com ---------#
+#------ teldredge1979@gmail.com ------#
+#-------------------------------------#
+### THESE EFFECTS ARE MOSTLY DESIGNED FOR A LOOP/RING OF LEDS
+### BUT PLENTY USEFUL FOR OTHER CONFIGURATIONS
+### RECENT CHANGES v0.51
+    -ADDED SOFTWARE SERIAL FOR BLUETOOTH CONTROL
+    -ADDED (z) SHOW LED COMMAND (FOR BETTER SERIAL CONTROL)
+    -ADDED SET (a)ll LEDS TO COLOR HSV (0-255)
+    -ADDED (c)lear FUNCTION
+    -ADDED (v) SET INDIVIDUAL LED HSV FUNCTION
+    -ADDED (Q)UERY VERSION NUMBER FUNCTION
+### NOTES  
+    -MAKE SURE YOU ARE USING FAST_SPI RC3 OR LATER
+    -THIS IS AN EXAMPLE LIBRARY SO YOU'LL PRABALY WANT TO EDIT TO DO ANYTHING USEFUL WITH IT
+    -GOTO FUNKBOXING FAST_SPI2 COMMENTS PAGE FOR HELP
+    -DEMO MODE BLOCKS SERIAL COMMANDS
+### LICENSE:::USE FOR WHATEVER YOU WANT, WHENEVER YOU WANT, HOWEVER YOU WANT, WHYEVER YOU WANT
 ### BUT YOU MUST YODEL ONCE FOR FREEDOM AND MAYBE DONATE TO SOMETHING WORTHWHILE
---------------------------------------------------------------------------------------------------
 
-from http://funkboxing.com/wordpress/?p=1366
-
-*/
-
-/*----------------------------------------------------|
+|-----------------------------------------------------|
 |                                                     |
 |           FROM THE FAST_SPI2 EXAMPLE FILE           |
 |                                                     |
@@ -33,144 +35,102 @@ from http://funkboxing.com/wordpress/?p=1366
 
 // Uncomment this line if you want to talk to DMX controllers
 // #define FASTSPI_USE_DMX_SIMPLE 1
+//-----------------------------------------------------
 
-
-
+#include <SoftwareSerial.h>
 #include <FastSPI_LED2.h>
-#include <SerialCommand.h>
 
-#define NUM_LEDS 30
-#define CONTROL_PIN 13
+#define VERSION_NUMBER 0.51
+
+//---LED SETUP STUFF
+#define LED_COUNT 59          //FOR TESTING w/ SIGN
+#define LED_DT 11             //SERIAL DATA PIN
+#define LED_CK 13             //SERIAL CLOCK PIN
 
 int BOTTOM_INDEX = 0;
-int TOP_INDEX = int(NUM_LEDS/2);
-int EVENODD = NUM_LEDS%2;
+int TOP_INDEX = int(LED_COUNT/2);
+int EVENODD = LED_COUNT%2;
+struct CRGB leds[LED_COUNT];
+int ledsX[LED_COUNT][3];     //-ARRAY FOR COPYING WHATS IN THE LED STRIP CURRENTLY (FOR CELL-AUTOMATA, MARCH, ETC)
+//int ledMode = 3;           //-START IN RAINBOW LOOP
+int ledMode = 888;         //-START IN DEMO MODE
+//int ledMode = 6;             //-MODE TESTING
 
-struct CRGB leds[NUM_LEDS];
+int thisdelay = 20;          //-FX LOOPS DELAY VAR
+int thisstep = 10;           //-FX LOOPS DELAY VAR
+int thishue = 0;             //-FX LOOPS DELAY VAR
+int thissat = 255;           //-FX LOOPS DELAY VAR
+int max_bright = 64;         //-SET MAX BRIGHTNESS TO 1/4
 
-int ledsX[NUM_LEDS][3]; //-ARRAY FOR COPYING WHATS IN THE LED STRIP CURRENTLY (FOR CELL-AUTOMATA, ETC)
+int thisindex = 0;           //-SET SINGLE LED VAR
+int thisRED = 0;
+int thisGRN = 0;
+int thisBLU = 0;
 
-SerialCommand sCmd;     //-SETUP SerialCommand OBJECT
+//---SERIAL/SOFTWARE SERIAL SETUP STUFF
+//#define SERIAL_BAUDRATE 9600
+#define SERIAL_BAUDRATE 57600
+//#define SERIAL_BAUDRATE 115200
+#define SERIAL_TIMEOUT 5
 
-int ledMode = 888;      //-START IN DEMO MODE (THIS MODE BLOCKS OUT SERIAL COMMANDS FOR AWHILE)
-//int ledMode = 8;      //-START IN POLICE MODE
-//int ledMode = 2;      //-START IN CYLON MODE
+#define SOFT_RX_PIN 2         // BTCHIP-TX -> NANO-SOFT-RX (2)
+#define SOFT_TX_PIN 3         // BTCHIP-RX -> NANO-SOFT-TX (3)
 
-//-PERISTENT VARS
-int idex = 0;        //-LED INDEX (0 to NUM_LEDS-1
-int idx_offset = 0;  //-OFFSET INDEX (BOTTOM LED TO ZERO WHEN LOOP IS TURNED/DOESN'T REALLY WORK)
-int ihue = 0;        //-HUE (0-360)
-int ibright = 0;     //-BRIGHTNESS (0-255)
-int isat = 0;        //-SATURATION (0-255)
-int bouncedirection = 0;  //-SWITCH FOR COLOR BOUNCE (0-1)
-float tcount = 0.0;      //-INC VAR FOR SIN LOOPS
-int lcount = 0;      //-ANOTHER COUNTING VAR
+SoftwareSerial btSerial(SOFT_RX_PIN, SOFT_TX_PIN);
+int btBOOL = 1;              //-ACTIVATE BLUETOOTH OR NOT
+byte inbyte;                 //-SERIAL INPUT BYTE
+int thisarg;                 //-SERIAL INPUT ARG
+
+//---LED FX VARS
+int idex = 0;                //-LED INDEX (0 to LED_COUNT-1
+int ihue = 0;                //-HUE (0-255)
+int ibright = 0;             //-BRIGHTNESS (0-255)
+int isat = 0;                //-SATURATION (0-255)
+int bouncedirection = 0;     //-SWITCH FOR COLOR BOUNCE (0-1)
+float tcount = 0.0;          //-INC VAR FOR SIN LOOPS
+int lcount = 0;              //-ANOTHER COUNTING VAR
+
 
 //------------------------------------- UTILITY FXNS --------------------------------------
-
-//-SET THE COLOR OF A SINGLE RGB LED
+//---SET THE COLOR OF A SINGLE RGB LED
 void set_color_led(int adex, int cred, int cgrn, int cblu) {  
-  int bdex;
-  
-  if (idx_offset > 0) {  //-APPLY INDEX OFFSET 
-    bdex = (adex + idx_offset) % NUM_LEDS;
-  }
-  else {bdex = adex;}
+  leds[adex].setRGB( cred, cgrn, cblu);
+} 
 
-  leds[bdex].r = cred;
-  leds[bdex].g = cgrn;
-  leds[bdex].b = cblu;  
-  }
-
-
-//-FIND INDEX OF HORIZONAL OPPOSITE LED
+//---FIND INDEX OF HORIZONAL OPPOSITE LED
 int horizontal_index(int i) {
   //-ONLY WORKS WITH INDEX < TOPINDEX
   if (i == BOTTOM_INDEX) {return BOTTOM_INDEX;}
   if (i == TOP_INDEX && EVENODD == 1) {return TOP_INDEX + 1;}
   if (i == TOP_INDEX && EVENODD == 0) {return TOP_INDEX;}
-  return NUM_LEDS - i;  
+  return LED_COUNT - i;  
 }
 
-//-FIND INDEX OF ANTIPODAL OPPOSITE LED
+//---FIND INDEX OF ANTIPODAL OPPOSITE LED
 int antipodal_index(int i) {
-  //int N2 = int(NUM_LEDS/2);
   int iN = i + TOP_INDEX;
-  if (i >= TOP_INDEX) {iN = ( i + TOP_INDEX ) % NUM_LEDS; }
+  if (i >= TOP_INDEX) {iN = ( i + TOP_INDEX ) % LED_COUNT; }
   return iN;
 }
 
-
-//-FIND ADJACENT INDEX CLOCKWISE
+//---FIND ADJACENT INDEX CLOCKWISE
 int adjacent_cw(int i) {
   int r;
-  if (i < NUM_LEDS - 1) {r = i + 1;}
+  if (i < LED_COUNT - 1) {r = i + 1;}
   else {r = 0;}
   return r;
 }
 
-
-//-FIND ADJACENT INDEX COUNTER-CLOCKWISE
+//---FIND ADJACENT INDEX COUNTER-CLOCKWISE
 int adjacent_ccw(int i) {
   int r;
   if (i > 0) {r = i - 1;}
-  else {r = NUM_LEDS - 1;}
+  else {r = LED_COUNT - 1;}
   return r;
 }
 
-
-//-CONVERT HSV VALUE TO RGB
-void HSVtoRGB(int hue, int sat, int val, int colors[3]) {
-	// hue: 0-359, sat: 0-255, val (lightness): 0-255
-	int r, g, b, base;
-
-	if (sat == 0) { // Achromatic color (gray).
-		colors[0]=val;
-		colors[1]=val;
-		colors[2]=val;
-	} else  {
-		base = ((255 - sat) * val)>>8;
-		switch(hue/60) {
-			case 0:
-				r = val;
-				g = (((val-base)*hue)/60)+base;
-				b = base;
-				break;
-			case 1:
-				r = (((val-base)*(60-(hue%60)))/60)+base;
-				g = val;
-				b = base;
-				break;
-			case 2:
-				r = base;
-				g = val;
-				b = (((val-base)*(hue%60))/60)+base;
-				break;
-			case 3:
-				r = base;
-				g = (((val-base)*(60-(hue%60)))/60)+base;
-				b = val;
-				break;
-			case 4:
-				r = (((val-base)*(hue%60))/60)+base;
-				g = base;
-				b = val;
-				break;
-			case 5:
-				r = val;
-				g = base;
-				b = (((val-base)*(60-(hue%60)))/60)+base;
-				break;
-		}
-		colors[0]=r;
-		colors[1]=g;
-		colors[2]=b;
-	}
-}
-
-
 void copy_led_array(){
-  for(int i = 0; i < NUM_LEDS; i++ ) {
+  for(int i = 0; i < LED_COUNT; i++ ) {
     ledsX[i][0] = leds[i].r;
     ledsX[i][1] = leds[i].g;
     ledsX[i][2] = leds[i].b;
@@ -178,90 +138,51 @@ void copy_led_array(){
 }
 
 
-void print_led_arrays(int ilen){
-  copy_led_array();
-  Serial.println("~~~***ARRAYS|idx|led-r-g-b|ledX-0-1-2");
-  for(int i = 0; i < ilen; i++ ) {
-      Serial.print("~~~");
-      Serial.print(i);
-      Serial.print("|");      
-      Serial.print(leds[i].r);
-      Serial.print("-");
-      Serial.print(leds[i].g);
-      Serial.print("-");
-      Serial.print(leds[i].b);
-      Serial.print("|");      
-      Serial.print(ledsX[i][0]);
-      Serial.print("-");
-      Serial.print(ledsX[i][1]);
-      Serial.print("-");
-      Serial.println(ledsX[i][2]);
-    }  
-}
-
 //------------------------LED EFFECT FUNCTIONS------------------------
-
-void one_color_all(int cred, int cgrn, int cblu) { //-SET ALL LEDS TO ONE COLOR
-    for(int i = 0 ; i < NUM_LEDS; i++ ) {
-      set_color_led(i, cred, cgrn, cblu);
-      LEDS.show();       
-      delay(1);
-    }  
+void one_color_all(int cred, int cgrn, int cblu) {       //-SET ALL LEDS TO ONE COLOR
+    for(int i = 0 ; i < LED_COUNT; i++ ) {
+      leds[i].setRGB( cred, cgrn, cblu);
+    }
 }
 
-void one_color_allNOSHOW(int cred, int cgrn, int cblu) { //-SET ALL LEDS TO ONE COLOR
-    for(int i = 0 ; i < NUM_LEDS; i++ ) {
-      set_color_led(i, cred, cgrn, cblu);
-
-    }  
+void one_color_allHSV(int ahue) {    //-SET ALL LEDS TO ONE COLOR (HSV)
+    for(int i = 0 ; i < LED_COUNT; i++ ) {
+      leds[i] = CHSV(ahue, thissat, 255);
+    }
 }
 
-
-void rainbow_fade(int idelay) { //-FADE ALL LEDS THROUGH HSV RAINBOW
+void rainbow_fade() {                         //-m2-FADE ALL LEDS THROUGH HSV RAINBOW
     ihue++;
-    if (ihue >= 359) {ihue = 0;}
-    int thisColor[3];
-    HSVtoRGB(ihue, 255, 255, thisColor);
-    for(int idex = 0 ; idex < NUM_LEDS; idex++ ) {
-      set_color_led(idex,thisColor[0],thisColor[1],thisColor[2]); 
+    if (ihue > 255) {ihue = 0;}
+    for(int idex = 0 ; idex < LED_COUNT; idex++ ) {
+      leds[idex] = CHSV(ihue, thissat, 255);
     }
     LEDS.show();    
-    delay(idelay);
+    delay(thisdelay);
 }
 
-
-void rainbow_loop(int istep, int idelay) { //-LOOP HSV RAINBOW
+void rainbow_loop() {                        //-m3-LOOP HSV RAINBOW
   idex++;
-  ihue = ihue + istep;
-  int icolor[3];  
-
-  if (idex >= NUM_LEDS) {idex = 0;}
-  if (ihue >= 359) {ihue = 0;}
-
-  HSVtoRGB(ihue, 255, 255, icolor);
-  set_color_led(idex, icolor[0], icolor[1], icolor[2]);
+  ihue = ihue + thisstep;
+  if (idex >= LED_COUNT) {idex = 0;}
+  if (ihue > 255) {ihue = 0;}
+  leds[idex] = CHSV(ihue, thissat, 255);
   LEDS.show();
-  delay(idelay);
+  delay(thisdelay);
 }
 
-
-void random_burst(int idelay) { //-RANDOM INDEX/COLOR
-  int icolor[3];  
-  
-  idex = random(0,NUM_LEDS);
-  ihue = random(0,359);
-
-  HSVtoRGB(ihue, 255, 255, icolor);
-  set_color_led(idex, icolor[0], icolor[1], icolor[2]);
-  LEDS.show();  
-  delay(idelay);
+void random_burst() {                         //-m4-RANDOM INDEX/COLOR
+  idex = random(0, LED_COUNT);
+  ihue = random(0, 255);  
+  leds[idex] = CHSV(ihue, thissat, 255);
+  LEDS.show();
+  delay(thisdelay);
 }
 
-
-void color_bounce(int idelay) { //-BOUNCE COLOR (SINGLE LED)
+void color_bounce() {                        //-m5-BOUNCE COLOR (SINGLE LED)
   if (bouncedirection == 0) {
     idex = idex + 1;
-    if (idex == NUM_LEDS) {
+    if (idex == LED_COUNT) {
       bouncedirection = 1;
       idex = idex - 1;
     }
@@ -272,46 +193,18 @@ void color_bounce(int idelay) { //-BOUNCE COLOR (SINGLE LED)
       bouncedirection = 0;
     }
   }  
-  for(int i = 0; i < NUM_LEDS; i++ ) {
-    if (i == idex) {set_color_led(i, 255, 0, 0);}
-    else {set_color_led(i, 0, 0, 0);}
+  for(int i = 0; i < LED_COUNT; i++ ) {
+    if (i == idex) {leds[i] = CHSV(thishue, thissat, 255);}
+    else {leds[i] = CHSV(0, 0, 0);}
   }
   LEDS.show();
-  delay(idelay);
+  delay(thisdelay);
 }
 
-
-void police_lightsONE(int idelay) { //-POLICE LIGHTS (TWO COLOR SINGLE LED)
-  idex++;
-  if (idex >= NUM_LEDS) {idex = 0;}
-  int idexR = idex;
-  int idexB = antipodal_index(idexR);  
-  for(int i = 0; i < NUM_LEDS; i++ ) {
-    if (i == idexR) {set_color_led(i, 255, 0, 0);}
-    else if (i == idexB) {set_color_led(i, 0, 0, 255);}    
-    else {set_color_led(i, 0, 0, 0);}
-  }
-  LEDS.show();  
-  delay(idelay);
-}
-
-
-void police_lightsALL(int idelay) { //-POLICE LIGHTS (TWO COLOR SOLID)
-  idex++;
-  if (idex >= NUM_LEDS) {idex = 0;}
-  int idexR = idex;
-  int idexB = antipodal_index(idexR);
-  set_color_led(idexR, 255, 0, 0);
-  set_color_led(idexB, 0, 0, 255);
-  LEDS.show();  
-  delay(idelay);
-}
-
-
-void color_bounceFADE(int idelay) { //-BOUNCE COLOR (SIMPLE MULTI-LED FADE)
+void color_bounceFADE() {                    //-m6-BOUNCE COLOR (SIMPLE MULTI-LED FADE)
   if (bouncedirection == 0) {
     idex = idex + 1;
-    if (idex == NUM_LEDS) {
+    if (idex == LED_COUNT) {
       bouncedirection = 1;
       idex = idex - 1;
     }
@@ -324,48 +217,65 @@ void color_bounceFADE(int idelay) { //-BOUNCE COLOR (SIMPLE MULTI-LED FADE)
   }
   int iL1 = adjacent_cw(idex);
   int iL2 = adjacent_cw(iL1);
-  int iL3 = adjacent_cw(iL2);  
+  int iL3 = adjacent_cw(iL2);
   int iR1 = adjacent_ccw(idex);
   int iR2 = adjacent_ccw(iR1);
-  int iR3 = adjacent_ccw(iR2); 
-  
-  for(int i = 0; i < NUM_LEDS; i++ ) {
-    if (i == idex) {set_color_led(i, 255, 0, 0);}
-    else if (i == iL1) {set_color_led(i, 100, 0, 0);}
-    else if (i == iL2) {set_color_led(i, 50, 0, 0);}
-    else if (i == iL3) {set_color_led(i, 10, 0, 0);}        
-    else if (i == iR1) {set_color_led(i, 100, 0, 0);}
-    else if (i == iR2) {set_color_led(i, 50, 0, 0);}
-    else if (i == iR3) {set_color_led(i, 10, 0, 0);}    
-    else {set_color_led(i, 0, 0, 0);}
+  int iR3 = adjacent_ccw(iR2);
+  for(int i = 0; i < LED_COUNT; i++ ) {
+    if (i == idex) {leds[i] = CHSV(thishue, thissat, 255);}
+    else if (i == iL1) {leds[i] = CHSV(thishue, thissat, 150);}
+    else if (i == iL2) {leds[i] = CHSV(thishue, thissat, 80);}
+    else if (i == iL3) {leds[i] = CHSV(thishue, thissat, 20);}        
+    else if (i == iR1) {leds[i] = CHSV(thishue, thissat, 150);}
+    else if (i == iR2) {leds[i] = CHSV(thishue, thissat, 80);}
+    else if (i == iR3) {leds[i] = CHSV(thishue, thissat, 20);}    
+    else {leds[i] = CHSV(0, 0, 0);}
   }
- 
   LEDS.show();
-  delay(idelay);
+  delay(thisdelay);
 }
 
+void ems_lightsONE() {                    //-m7-EMERGENCY LIGHTS (TWO COLOR SINGLE LED)
+  idex++;
+  if (idex >= LED_COUNT) {idex = 0;}
+  int idexR = idex;
+  int idexB = antipodal_index(idexR);
+  int thathue = (thishue + 160) % 255;  
+  for(int i = 0; i < LED_COUNT; i++ ) {
+    if (i == idexR) {leds[i] = CHSV(thishue, thissat, 255);}
+    else if (i == idexB) {leds[i] = CHSV(thathue, thissat, 255);}    
+    else {leds[i] = CHSV(0, 0, 0);}
+  }
+  LEDS.show();  
+  delay(thisdelay);
+}
 
-void flicker(int thishue, int thissat) {
+void ems_lightsALL() {                  //-m8-EMERGENCY LIGHTS (TWO COLOR SOLID)
+  idex++;
+  if (idex >= LED_COUNT) {idex = 0;}
+  int idexR = idex;
+  int idexB = antipodal_index(idexR);
+  int thathue = (thishue + 160) % 255;
+  leds[idexR] = CHSV(thishue, thissat, 255);
+  leds[idexB] = CHSV(thathue, thissat, 255);  
+  LEDS.show();  
+  delay(thisdelay);
+}
+
+void flicker() {                          //-m9-FLICKER EFFECT
   int random_bright = random(0,255);
   int random_delay = random(10,100);
   int random_bool = random(0,random_bright);
-  int thisColor[3];
-  
   if (random_bool < 10) {
-    HSVtoRGB(thishue, thissat, random_bright, thisColor);
-
-    for(int i = 0 ; i < NUM_LEDS; i++ ) {
-      set_color_led(i, thisColor[0], thisColor[1], thisColor[2]);
+    for(int i = 0 ; i < LED_COUNT; i++ ) {
+      leds[i] = CHSV(thishue, thissat, random_bright);
     }
-    
-    LEDS.show();    
+    LEDS.show();
     delay(random_delay);
   }
 }
 
-
-void pulse_one_color_all(int ahue, int idelay) { //-PULSE BRIGHTNESS ON ALL LEDS TO ONE COLOR 
-
+void pulse_one_color_all() {              //-m10-PULSE BRIGHTNESS ON ALL LEDS TO ONE COLOR 
   if (bouncedirection == 0) {
     ibright++;
     if (ibright >= 255) {bouncedirection = 1;}
@@ -374,20 +284,14 @@ void pulse_one_color_all(int ahue, int idelay) { //-PULSE BRIGHTNESS ON ALL LEDS
     ibright = ibright - 1;
     if (ibright <= 1) {bouncedirection = 0;}         
   }  
-    
-  int acolor[3];
-  HSVtoRGB(ahue, 255, ibright, acolor);
-  
-    for(int i = 0 ; i < NUM_LEDS; i++ ) {
-      set_color_led(i, acolor[0], acolor[1], acolor[2]);
+    for(int idex = 0 ; idex < LED_COUNT; idex++ ) {
+      leds[idex] = CHSV(thishue, thissat, ibright);
     }
     LEDS.show();    
-    delay(idelay);
+    delay(thisdelay);
 }
 
-
-void pulse_one_color_all_rev(int ahue, int idelay) { //-PULSE SATURATION ON ALL LEDS TO ONE COLOR 
-
+void pulse_one_color_all_rev() {           //-m11-PULSE SATURATION ON ALL LEDS TO ONE COLOR 
   if (bouncedirection == 0) {
     isat++;
     if (isat >= 255) {bouncedirection = 1;}
@@ -396,21 +300,29 @@ void pulse_one_color_all_rev(int ahue, int idelay) { //-PULSE SATURATION ON ALL 
     isat = isat - 1;
     if (isat <= 1) {bouncedirection = 0;}         
   }  
-    
-  int acolor[3];
-  HSVtoRGB(ahue, isat, 255, acolor);
-  
-    for(int i = 0 ; i < NUM_LEDS; i++ ) {
-      set_color_led(i, acolor[0], acolor[1], acolor[2]);
+    for(int idex = 0 ; idex < LED_COUNT; idex++ ) {
+      leds[idex] = CHSV(thishue, isat, 255);
     }
     LEDS.show();
-    delay(idelay);
+    delay(thisdelay);
 }
 
+void fade_vertical() {                    //-m12-FADE 'UP' THE LOOP
+  idex++;
+  if (idex > TOP_INDEX) {idex = 0;}  
+  int idexA = idex;
+  int idexB = horizontal_index(idexA);
+  ibright = ibright + 10;
+  if (ibright > 255) {ibright = 0;}
+  leds[idexA] = CHSV(thishue, thissat, ibright);
+  leds[idexB] = CHSV(thishue, thissat, ibright);
+  LEDS.show();
+  delay(thisdelay);
+}
 
-void random_red() { //QUICK 'N DIRTY RANDOMIZE TO GET CELL AUTOMATA STARTED  
+void random_red() {                       //QUICK 'N DIRTY RANDOMIZE TO GET CELL AUTOMATA STARTED  
   int temprand;
-  for(int i = 0; i < NUM_LEDS; i++ ) {
+  for(int i = 0; i < LED_COUNT; i++ ) {
     temprand = random(0,100);
     if (temprand > 50) {leds[i].r = 255;}
     if (temprand <= 50) {leds[i].r = 0;}
@@ -419,13 +331,16 @@ void random_red() { //QUICK 'N DIRTY RANDOMIZE TO GET CELL AUTOMATA STARTED
   LEDS.show();  
 }
 
-
-void rule30(int idelay) { //1D CELLULAR AUTOMATA - RULE 30 (RED FOR NOW)
+void rule30() {                          //-m13-1D CELLULAR AUTOMATA - RULE 30 (RED FOR NOW)
+  if (bouncedirection == 0) {
+    random_red();
+    bouncedirection = 1;
+  }
   copy_led_array();
   int iCW;
   int iCCW;
   int y = 100;  
-  for(int i = 0; i < NUM_LEDS; i++ ) {
+  for(int i = 0; i < LED_COUNT; i++ ) {
     iCW = adjacent_cw(i);
     iCCW = adjacent_ccw(i);
     if (ledsX[iCCW][0] > y && ledsX[i][0] > y && ledsX[iCW][0] > y) {leds[i].r = 0;}
@@ -437,42 +352,29 @@ void rule30(int idelay) { //1D CELLULAR AUTOMATA - RULE 30 (RED FOR NOW)
     if (ledsX[iCCW][0] <= y && ledsX[i][0] <= y && ledsX[iCW][0] > y) {leds[i].r = 255;}
     if (ledsX[iCCW][0] <= y && ledsX[i][0] <= y && ledsX[iCW][0] <= y) {leds[i].r = 0;}
   }
-  
   LEDS.show();  
-  delay(idelay);
+  delay(thisdelay);
 }
 
-
-void random_march(int idelay) { //RANDOM MARCH CCW
+void random_march() {                   //-m14-RANDOM MARCH CCW
   copy_led_array();
   int iCCW;
-  
-  int acolor[3];
-  HSVtoRGB(random(0,360), 255, 255, acolor);
-  
-  leds[0].r = acolor[0];
-  leds[0].g = acolor[1];
-  leds[0].b = acolor[2];
-  
-  for(int i = 1; i < NUM_LEDS ; i++ ) {  //-GET/SET EACH LED COLOR FROM CCW LED
-    iCCW = adjacent_ccw(i);
-    leds[i].r = ledsX[iCCW][0];
-    leds[i].g = ledsX[iCCW][1];
-    leds[i].b = ledsX[iCCW][2];    
+  leds[0] = CHSV(random(0,255), 255, 255);
+  for(int idex = 1; idex < LED_COUNT ; idex++ ) {
+    iCCW = adjacent_ccw(idex);
+    leds[idex].r = ledsX[iCCW][0];
+    leds[idex].g = ledsX[iCCW][1];
+    leds[idex].b = ledsX[iCCW][2];
   }
-  
   LEDS.show();  
-  delay(idelay);
+  delay(thisdelay);
 }
 
-
-void rwb_march(int idelay) { //R,W,B MARCH CCW
+void rwb_march() {                    //-m15-R,W,B MARCH CCW
   copy_led_array();
   int iCCW;
-  
   idex++;
   if (idex > 2) {idex = 0;}
-  
   switch (idex) {
     case 0:
       leds[0].r = 255;
@@ -490,95 +392,82 @@ void rwb_march(int idelay) { //R,W,B MARCH CCW
       leds[0].b = 255;
     break;
   }
-      
-    for(int i = 1; i < NUM_LEDS; i++ ) {  //-GET/SET EACH LED COLOR FROM CCW LED
+    for(int i = 1; i < LED_COUNT; i++ ) {
       iCCW = adjacent_ccw(i);
       leds[i].r = ledsX[iCCW][0];
       leds[i].g = ledsX[iCCW][1];
       leds[i].b = ledsX[iCCW][2];    
     }
-  
   LEDS.show();  
-  delay(idelay);
+  delay(thisdelay);
 }
 
-
-void white_temps() {
-  int N9 = int(NUM_LEDS/9);
-  for (int i = 0; i < NUM_LEDS; i++ ) {
-    if (i >= 0 && i < N9) {leds[i].r = 255; leds[i].g = 147; leds[i].b = 41;} //-CANDLE - 1900
-    if (i >= N9 && i < N9*2) {leds[i].r = 255; leds[i].g = 197; leds[i].b = 143;} //-40W TUNG - 2600
-    if (i >= N9*2 && i < N9*3) {leds[i].r = 255; leds[i].g = 214; leds[i].b = 170;} //-100W TUNG - 2850
-    if (i >= N9*3 && i < N9*4) {leds[i].r = 255; leds[i].g = 241; leds[i].b = 224;} //-HALOGEN - 3200
-    if (i >= N9*4 && i < N9*5) {leds[i].r = 255; leds[i].g = 250; leds[i].b = 244;} //-CARBON ARC - 5200
-    if (i >= N9*5 && i < N9*6) {leds[i].r = 255; leds[i].g = 255; leds[i].b = 251;} //-HIGH NOON SUN - 5400
-    if (i >= N9*6 && i < N9*7) {leds[i].r = 255; leds[i].g = 255; leds[i].b = 255;} //-DIRECT SUN - 6000
-    if (i >= N9*7 && i < N9*8) {leds[i].r = 201; leds[i].g = 226; leds[i].b = 255;} //-OVERCAST SKY - 7000
-    if (i >= N9*8 && i < NUM_LEDS) {leds[i].r = 64; leds[i].g = 156; leds[i].b = 255;} //-CLEAR BLUE SKY - 20000  
-  }
-  LEDS.show();  
-  delay(100);
+void radiation() {                   //-m16-SORT OF RADIATION SYMBOLISH- 
+  int N3  = int(LED_COUNT/3);
+  int N6  = int(LED_COUNT/6);  
+  int N12 = int(LED_COUNT/12);  
+  for(int i = 0; i < N6; i++ ) {     //-HACKY, I KNOW...
+    tcount = tcount + .02;
+    if (tcount > 3.14) {tcount = 0.0;}
+    ibright = int(sin(tcount)*255);    
+    int j0 = (i + LED_COUNT - N12) % LED_COUNT;
+    int j1 = (j0+N3) % LED_COUNT;
+    int j2 = (j1+N3) % LED_COUNT;    
+    leds[j0] = CHSV(thishue, thissat, ibright);
+    leds[j1] = CHSV(thishue, thissat, ibright);
+    leds[j2] = CHSV(thishue, thissat, ibright);    
+  }    
+  LEDS.show();    
+  delay(thisdelay);    
 }
 
-
-void color_loop_vardelay() { //-COLOR LOOP (SINGLE LED) w/ VARIABLE DELAY
+void color_loop_vardelay() {                    //-m17-COLOR LOOP (SINGLE LED) w/ VARIABLE DELAY
   idex++;
-  if (idex > NUM_LEDS) {idex = 0;}
-
-  int acolor[3];
-  HSVtoRGB(0, 255, 255, acolor);
-  
-  int di = abs(TOP_INDEX - idex); //-DISTANCE TO CENTER    
-  int t = constrain((10/di)*10, 10, 500); //-DELAY INCREASE AS INDEX APPROACHES CENTER (WITHIN LIMITS)
-  
-  for(int i = 0; i < NUM_LEDS; i++ ) {
+  if (idex > LED_COUNT) {idex = 0;}
+  int di = abs(TOP_INDEX - idex);
+  int t = constrain((10/di)*10, 10, 500);
+  for(int i = 0; i < LED_COUNT; i++ ) {
     if (i == idex) {
-      leds[i].r = acolor[0]; leds[i].g = acolor[1]; leds[i].b = acolor[2];
+      leds[i] = CHSV(0, thissat, 255);
     }
     else {
       leds[i].r = 0; leds[i].g = 0; leds[i].b = 0;
     }
   }
-  
   LEDS.show();  
   delay(t);
 }
 
-  
-void strip_march_cw(int idelay) { //-MARCH STRIP C-W
-  copy_led_array();
-  int iCCW;  
-  for(int i = 0; i < NUM_LEDS; i++ ) {  //-GET/SET EACH LED COLOR FROM CCW LED
-    iCCW = adjacent_ccw(i);
-    leds[i].r = ledsX[iCCW][0];
-    leds[i].g = ledsX[iCCW][1];
-    leds[i].b = ledsX[iCCW][2];    
+void white_temps() {                            //-m18-SHOW A SAMPLE OF BLACK BODY RADIATION COLOR TEMPERATURES
+  int N9 = int(LED_COUNT/9);
+  for (int i = 0; i < LED_COUNT; i++ ) {
+    if (i >= 0 && i < N9) {leds[i].r = 255; leds[i].g = 147; leds[i].b = 41;}         //-CANDLE - 1900
+    if (i >= N9 && i < N9*2) {leds[i].r = 255; leds[i].g = 197; leds[i].b = 143;}     //-40W TUNG - 2600
+    if (i >= N9*2 && i < N9*3) {leds[i].r = 255; leds[i].g = 214; leds[i].b = 170;}   //-100W TUNG - 2850
+    if (i >= N9*3 && i < N9*4) {leds[i].r = 255; leds[i].g = 241; leds[i].b = 224;}   //-HALOGEN - 3200
+    if (i >= N9*4 && i < N9*5) {leds[i].r = 255; leds[i].g = 250; leds[i].b = 244;}   //-CARBON ARC - 5200
+    if (i >= N9*5 && i < N9*6) {leds[i].r = 255; leds[i].g = 255; leds[i].b = 251;}   //-HIGH NOON SUN - 5400
+    if (i >= N9*6 && i < N9*7) {leds[i].r = 255; leds[i].g = 255; leds[i].b = 255;}   //-DIRECT SUN - 6000
+    if (i >= N9*7 && i < N9*8) {leds[i].r = 201; leds[i].g = 226; leds[i].b = 255;}   //-OVERCAST SKY - 7000
+    if (i >= N9*8 && i < LED_COUNT) {leds[i].r = 64; leds[i].g = 156; leds[i].b = 255;}//-CLEAR BLUE SKY - 20000  
   }
   LEDS.show();  
-  delay(idelay);
+  delay(100);
 }
 
-
-void strip_march_ccw(int idelay) { //-MARCH STRIP C-W 
-  copy_led_array();
-  int iCW;  
-  for(int i = 0; i < NUM_LEDS; i++ ) {  //-GET/SET EACH LED COLOR FROM CCW LED
-    iCW = adjacent_cw(i);
-    leds[i].r = ledsX[iCW][0];
-    leds[i].g = ledsX[iCW][1];
-    leds[i].b = ledsX[iCW][2];    
+void sin_bright_wave() {        //-m19-BRIGHTNESS SINE WAVE
+  for(int i = 0; i < LED_COUNT; i++ ) {
+    tcount = tcount + .1;
+    if (tcount > 3.14) {tcount = 0.0;}
+    ibright = int(sin(tcount)*255);
+    leds[i] = CHSV(thishue, thissat, ibright);
+    LEDS.show();    
+    delay(thisdelay);
   }
-  LEDS.show();  
-  delay(idelay);
 }
 
-
-void pop_horizontal(int ahue, int idelay) {  //-POP FROM LEFT TO RIGHT UP THE RING
-  int acolor[3];
-  HSVtoRGB(ahue, 255, 255, acolor);
-  
+void pop_horizontal() {        //-m20-POP FROM LEFT TO RIGHT UP THE RING
   int ix;
-  
   if (bouncedirection == 0) {
     bouncedirection = 1;
     ix = idex;  
@@ -589,326 +478,506 @@ void pop_horizontal(int ahue, int idelay) {  //-POP FROM LEFT TO RIGHT UP THE RI
     idex++;
     if (idex > TOP_INDEX) {idex = 0;}      
   }
-  
-  for(int i = 0; i < NUM_LEDS; i++ ) {
-    if (i == ix) {leds[i].r = acolor[0]; leds[i].g = acolor[1]; leds[i].b = acolor[2];}
-    else {leds[i].r = 0; leds[i].g = 0; leds[i].b = 0;}
+  for(int i = 0; i < LED_COUNT; i++ ) {
+    if (i == ix) {
+      leds[i] = CHSV(thishue, thissat, 255);
+    }
+    else {
+      leds[i].r = 0; leds[i].g = 0; leds[i].b = 0;
+    }
   }
-  
-  LEDS.show();  
-  delay(idelay);    
+  LEDS.show();
+  delay(thisdelay);    
 }
 
-
-void quad_bright_curve(int ahue, int idelay) {  //-QUADRATIC BRIGHTNESS CURVER
-  int acolor[3];
-  int ax;
-    
-  for(int x = 0; x < NUM_LEDS; x++ ) {
+void quad_bright_curve() {      //-m21-QUADRATIC BRIGHTNESS CURVER
+  int ax;    
+  for(int x = 0; x < LED_COUNT; x++ ) {
     if (x <= TOP_INDEX) {ax = x;}
-    else if (x > TOP_INDEX) {ax = NUM_LEDS-x;}
-
+    else if (x > TOP_INDEX) {ax = LED_COUNT-x;}
     int a = 1; int b = 1; int c = 0;
-        
     int iquad = -(ax*ax*a)+(ax*b)+c; //-ax2+bx+c
-    int hquad = -(TOP_INDEX*TOP_INDEX*a)+(TOP_INDEX*b)+c; //HIGHEST BRIGHTNESS
-    
+    int hquad = -(TOP_INDEX*TOP_INDEX*a)+(TOP_INDEX*b)+c;
     ibright = int((float(iquad)/float(hquad))*255);
-      
-    HSVtoRGB(ahue, 255, ibright, acolor);
-  
-    leds[x].r = acolor[0]; leds[x].g = acolor[1]; leds[x].b = acolor[2];
-
-  
+    leds[x] = CHSV(thishue, thissat, ibright);
   }
   LEDS.show();  
-  delay(idelay);
+  delay(thisdelay);
 }
 
-
-void flame() {
-  int acolor[3];
+void flame() {                                    //-m22-FLAMEISH EFFECT
   int idelay = random(0,35);
-  
   float hmin = 0.1; float hmax = 45.0;
   float hdif = hmax-hmin;
   int randtemp = random(0,3);
   float hinc = (hdif/float(TOP_INDEX))+randtemp;
-
-  int ahue = hmin;
-  for(int i = 0; i < TOP_INDEX; i++ ) {
-    
-    ahue = ahue + hinc;
-
-    HSVtoRGB(ahue, 255, 255, acolor);
-    
-    leds[i].r = acolor[0]; leds[i].g = acolor[1]; leds[i].b = acolor[2];
-    int ih = horizontal_index(i);
-    leds[ih].r = acolor[0]; leds[ih].g = acolor[1]; leds[ih].b = acolor[2];
-    
-    leds[TOP_INDEX].r = 255; leds[TOP_INDEX].g = 255; leds[TOP_INDEX].b = 255;
-  
+  int ihue = hmin;
+  for(int i = 0; i <= TOP_INDEX; i++ ) {
+    ihue = ihue + hinc;
+    leds[i] = CHSV(ihue, thissat, 255);
+    int ih = horizontal_index(i);    
+    leds[ih] = CHSV(ihue, thissat, 255);    
+    leds[TOP_INDEX].r = 255; leds[TOP_INDEX].g = 255; leds[TOP_INDEX].b = 255;    
     LEDS.show();    
     delay(idelay);
   }
 }
 
-
-void radiation(int ahue, int idelay) { //-SORT OF RADIATION SYMBOLISH- 
-  //int N2 = int(NUM_LEDS/2);
-  int N3 = int(NUM_LEDS/3);
-  int N6 = int(NUM_LEDS/6);  
-  int N12 = int(NUM_LEDS/12);  
-  int acolor[3];
-
-  for(int i = 0; i < N6; i++ ) { //-HACKY, I KNOW...
-    tcount = tcount + .02;
-    if (tcount > 3.14) {tcount = 0.0;}
-    ibright = int(sin(tcount)*255);
-    
-    int j0 = (i + NUM_LEDS - N12) % NUM_LEDS;
-    int j1 = (j0+N3) % NUM_LEDS;
-    int j2 = (j1+N3) % NUM_LEDS;    
-    HSVtoRGB(ahue, 255, ibright, acolor);  
-    leds[j0].r = acolor[0]; leds[j0].g = acolor[1]; leds[j0].b = acolor[2];
-    leds[j1].r = acolor[0]; leds[j1].g = acolor[1]; leds[j1].b = acolor[2];
-    leds[j2].r = acolor[0]; leds[j2].g = acolor[1]; leds[j2].b = acolor[2];    
-
-  }    
-    LEDS.show();    
-    delay(idelay);    
-}
-
-
-void sin_bright_wave(int ahue, int idelay) {  
-  int acolor[3];
-    
-  for(int i = 0; i < NUM_LEDS; i++ ) {
-    tcount = tcount + .1;
-    if (tcount > 3.14) {tcount = 0.0;}
-    ibright = int(sin(tcount)*255);
-  
-    HSVtoRGB(ahue, 255, ibright, acolor);
-  
-    leds[i].r = acolor[0]; leds[i].g = acolor[1]; leds[i].b = acolor[2];
-    
-    LEDS.show();    
-    delay(idelay);
-  }
-}
-
-
-void fade_vertical(int ahue, int idelay) { //-FADE 'UP' THE LOOP
+void rainbow_vertical() {                        //-m23-RAINBOW 'UP' THE LOOP
   idex++;
   if (idex > TOP_INDEX) {idex = 0;}  
+  ihue = ihue + thisstep;
+  if (ihue > 255) {ihue = 0;}
   int idexA = idex;
   int idexB = horizontal_index(idexA);
-  
-  ibright = ibright + 10;
-  if (ibright > 255) {ibright = 0;}
-  int acolor[3];
-  HSVtoRGB(ahue, 255, ibright, acolor);
-  
-  set_color_led(idexA, acolor[0], acolor[1], acolor[2]);  
-  set_color_led(idexB, acolor[0], acolor[1], acolor[2]);  
- 
+  leds[idexA] = CHSV(ihue, thissat, 255);
+  leds[idexB] = CHSV(ihue, thissat, 255);
   LEDS.show();  
-  delay(idelay);
+  delay(thisdelay);
 }
 
-
-void rainbow_vertical(int istep, int idelay) { //-RAINBOW 'UP' THE LOOP
-  idex++;
-  if (idex > TOP_INDEX) {idex = 0;}  
-  ihue = ihue + istep;
-  if (ihue > 359) {ihue = 0;}
-  Serial.println(ihue);  
-  int idexA = idex;
-  int idexB = horizontal_index(idexA);
-
-  int acolor[3];
-  HSVtoRGB(ihue, 255, 255, acolor);
-
-  set_color_led(idexA, acolor[0], acolor[1], acolor[2]);  
-  set_color_led(idexB, acolor[0], acolor[1], acolor[2]);  
- 
-  LEDS.show();  
-  delay(idelay);
-}
-
-
-void pacman(int idelay) { //-MARCH STRIP C-W
-  int s = int(NUM_LEDS/4);
+void pacman() {                                  //-m24-REALLY TERRIBLE PACMAN CHOMPING EFFECT
+  int s = int(LED_COUNT/4);
   lcount++;
   if (lcount > 5) {lcount = 0;}
   if (lcount == 0) {
-    one_color_allNOSHOW(255,255,0);}
+    for(int i = 0 ; i < LED_COUNT; i++ ) {set_color_led(i, 255, 255, 0);}
+    }
   if (lcount == 1 || lcount == 5) {
-      one_color_allNOSHOW(255,255,0);
-      leds[s].r = 0; leds[s].g = 0; leds[s].b = 0;}
+    for(int i = 0 ; i < LED_COUNT; i++ ) {set_color_led(i, 255, 255, 0);}
+    leds[s].r = 0; leds[s].g = 0; leds[s].b = 0;}
   if (lcount == 2 || lcount == 4) {
-      one_color_allNOSHOW(255,255,0);
-      leds[s-1].r = 0; leds[s-1].g = 0; leds[s-1].b = 0;  
-      leds[s].r = 0; leds[s].g = 0; leds[s].b = 0;
-      leds[s+1].r = 0; leds[s+1].g = 0; leds[s+1].b = 0;}        
+    for(int i = 0 ; i < LED_COUNT; i++ ) {set_color_led(i, 255, 255, 0);}
+    leds[s-1].r = 0; leds[s-1].g = 0; leds[s-1].b = 0;  
+    leds[s].r = 0; leds[s].g = 0; leds[s].b = 0;
+    leds[s+1].r = 0; leds[s+1].g = 0; leds[s+1].b = 0;}        
   if (lcount == 3) {
-      one_color_allNOSHOW(255,255,0);
-      leds[s-2].r = 0; leds[s-2].g = 0; leds[s-2].b = 0;  
-      leds[s-1].r = 0; leds[s-1].g = 0; leds[s-1].b = 0;  
-      leds[s].r = 0; leds[s].g = 0; leds[s].b = 0;
-      leds[s+1].r = 0; leds[s+1].g = 0; leds[s+1].b = 0;
-      leds[s+2].r = 0; leds[s+2].g = 0; leds[s+2].b = 0;}
-  
+    for(int i = 0 ; i < LED_COUNT; i++ ) {set_color_led(i, 255, 255, 0);}
+    leds[s-2].r = 0; leds[s-2].g = 0; leds[s-2].b = 0;  
+    leds[s-1].r = 0; leds[s-1].g = 0; leds[s-1].b = 0;  
+    leds[s].r = 0; leds[s].g = 0; leds[s].b = 0;
+    leds[s+1].r = 0; leds[s+1].g = 0; leds[s+1].b = 0;
+    leds[s+2].r = 0; leds[s+2].g = 0; leds[s+2].b = 0;}
   LEDS.show();  
-  delay(idelay);
+  delay(thisdelay);
+}
+
+void random_color_pop() {                         //-m25-RANDOM COLOR POP
+  idex = random(0, LED_COUNT);
+  ihue = random(0, 255);
+  one_color_all(0, 0, 0);
+  leds[idex] = CHSV(ihue, thissat, 255);
+  LEDS.show();
+  delay(thisdelay);
+}
+
+void ems_lightsSTROBE() {                  //-m26-EMERGENCY LIGHTS (STROBE LEFT/RIGHT)
+  int thishue = 0;
+  int thathue = (thishue + 160) % 255;
+  for(int x = 0 ; x < 5; x++ ) {
+    for(int i = 0 ; i < TOP_INDEX; i++ ) {
+        leds[i] = CHSV(thishue, thissat, 255);
+    }
+    LEDS.show(); delay(thisdelay); 
+    one_color_all(0, 0, 0);
+    LEDS.show(); delay(thisdelay);
+  }
+  for(int x = 0 ; x < 5; x++ ) {
+    for(int i = TOP_INDEX ; i < LED_COUNT; i++ ) {
+        leds[i] = CHSV(thathue, thissat, 255);
+    }
+    LEDS.show(); delay(thisdelay);
+    one_color_all(0, 0, 0);
+    LEDS.show(); delay(thisdelay);
+  }
+}
+
+void rgb_propeller() {                           //-m27-RGB PROPELLER 
+  idex++;
+  int ghue = (thishue + 80) % 255;
+  int bhue = (thishue + 160) % 255;
+  int N3  = int(LED_COUNT/3);
+  int N6  = int(LED_COUNT/6);  
+  int N12 = int(LED_COUNT/12);  
+  for(int i = 0; i < N3; i++ ) {
+    int j0 = (idex + i + LED_COUNT - N12) % LED_COUNT;
+    int j1 = (j0+N3) % LED_COUNT;
+    int j2 = (j1+N3) % LED_COUNT;    
+    leds[j0] = CHSV(thishue, thissat, 255);
+    leds[j1] = CHSV(ghue, thissat, 255);
+    leds[j2] = CHSV(bhue, thissat, 255);    
+  }
+  LEDS.show();    
+  delay(thisdelay);  
+}
+
+void kitt() {                                     //-m28-KNIGHT INDUSTIES 2000
+  int rand = random(0, TOP_INDEX);
+  for(int i = 0; i < rand; i++ ) {
+    leds[TOP_INDEX+i] = CHSV(thishue, thissat, 255);
+    leds[TOP_INDEX-i] = CHSV(thishue, thissat, 255);
+    LEDS.show();
+    delay(thisdelay/rand);
+  }
+  for(int i = rand; i > 0; i-- ) {
+    leds[TOP_INDEX+i] = CHSV(thishue, thissat, 0);
+    leds[TOP_INDEX-i] = CHSV(thishue, thissat, 0);
+    LEDS.show();
+    delay(thisdelay/rand);
+  }  
+}
+
+void matrix() {                                   //-m29-ONE LINE MATRIX
+  int rand = random(0, 100);
+  if (rand > 90) {
+    leds[0] = CHSV(thishue, thissat, 255);
+  }
+  else {leds[0] = CHSV(thishue, thissat, 0);}
+  copy_led_array();
+    for(int i = 1; i < LED_COUNT; i++ ) {
+    leds[i].r = ledsX[i-1][0];
+    leds[i].g = ledsX[i-1][1];
+    leds[i].b = ledsX[i-1][2];    
+  }
+  LEDS.show();  
+  delay(thisdelay);
+}
+
+void strip_march_cw() {                        //-m50-MARCH STRIP CW 
+  copy_led_array();
+  int iCW;  
+  for(int i = 0; i < LED_COUNT; i++ ) {
+    iCW = adjacent_cw(i);
+    leds[i].r = ledsX[iCW][0];
+    leds[i].g = ledsX[iCW][1];
+    leds[i].b = ledsX[iCW][2];    
+  }
+  LEDS.show();  
+  delay(thisdelay);
+}
+
+void strip_march_ccw() {                        //-m51-MARCH STRIP CCW
+  copy_led_array();
+  int iCCW;  
+  for(int i = 0; i < LED_COUNT; i++ ) {
+    iCCW = adjacent_ccw(i);
+    leds[i].r = ledsX[iCCW][0];
+    leds[i].g = ledsX[iCCW][1];
+    leds[i].b = ledsX[iCCW][2];    
+  }
+  LEDS.show();  
+  delay(thisdelay);
+}
+
+void new_rainbow_loop(){                       //-m88-RAINBOW FADE FROM FAST_SPI2
+  ihue -= 1;
+  fill_rainbow( leds, LED_COUNT, ihue );
+  LEDS.show();
+  delay(thisdelay);
+}
+
+void demo_modeA(){
+  int r = 10;
+  thisdelay = 20; thisstep = 10; thishue = 0; thissat = 255;
+  one_color_all(255,255,255); LEDS.show(); delay(1200);
+  for(int i=0; i<r*25; i++) {rainbow_fade();}
+  for(int i=0; i<r*20; i++) {rainbow_loop();}
+  for(int i=0; i<r*20; i++) {random_burst();}
+  for(int i=0; i<r*12; i++) {color_bounce();}
+  thisdelay = 40;
+  for(int i=0; i<r*12; i++) {color_bounceFADE();}
+  for(int i=0; i<r*6; i++) {ems_lightsONE();}
+  for(int i=0; i<r*5; i++) {ems_lightsALL();}
+  thishue = 160; thissat = 50;  
+  for(int i=0; i<r*40; i++) {flicker();}
+  one_color_all(0,0,0); LEDS.show();
+  thisdelay = 15; thishue = 0; thissat = 255;
+  for(int i=0; i<r*50; i++) {pulse_one_color_all();}
+  for(int i=0; i<r*40; i++) {pulse_one_color_all_rev();}
+  thisdelay = 60; thishue = 180; 
+  for(int i=0; i<r*5; i++) {fade_vertical();}
+  random_red();
+  thisdelay = 100;
+  for(int i=0; i<r*5; i++) {rule30();}
+  thisdelay = 40;
+  for(int i=0; i<r*8; i++) {random_march();}
+  thisdelay = 80;
+  for(int i=0; i<r*5; i++) {rwb_march();}
+  one_color_all(0,0,0); ; LEDS.show();
+  thisdelay = 60; thishue = 95; 
+  for(int i=0; i<r*15; i++) {radiation();}
+  for(int i=0; i<r*15; i++) {color_loop_vardelay();}
+  for(int i=0; i<r*5; i++) {white_temps();}
+  thisdelay = 35; thishue = 180; 
+  for(int i=0; i<r; i++) {sin_bright_wave();}
+  thisdelay = 100; thishue = 0; 
+  for(int i=0; i<r*5; i++) {pop_horizontal();}
+  thisdelay = 100; thishue = 180; 
+  for(int i=0; i<r*4; i++) {quad_bright_curve();}
+  one_color_all(0,0,0); LEDS.show();
+  for(int i=0; i<r*3; i++) {flame();}
+  thisdelay = 50;
+  for(int i=0; i<r*10; i++) {pacman();}
+  thisdelay = 50; thisstep = 15;
+  for(int i=0; i<r*12; i++) {rainbow_vertical();}
+  thisdelay = 100;
+  for(int i=0; i<r*3; i++) {strip_march_ccw();}
+  for(int i=0; i<r*3; i++) {strip_march_cw();}
+  demo_modeB();
+  thisdelay = 5;
+  for(int i=0; i<r*120; i++) {new_rainbow_loop();}
+  one_color_all(255,0,0); LEDS.show(); delay(1200);
+  one_color_all(0,255,0); LEDS.show(); delay(1200);
+  one_color_all(0,0,255); LEDS.show(); delay(1200);
+  one_color_all(255,255,0); LEDS.show(); delay(1200);
+  one_color_all(0,255,255); LEDS.show(); delay(1200);
+  one_color_all(255,0,255); LEDS.show(); delay(1200);
+}
+
+void demo_modeB(){
+  int r = 10;
+  one_color_all(0,0,0); LEDS.show();
+  thisdelay = 35;
+  for(int i=0; i<r*10; i++) {random_color_pop();}
+  for(int i=0; i<r/2; i++) {ems_lightsSTROBE();}
+  thisdelay = 50;  
+  for(int i=0; i<r*10; i++) {rgb_propeller();}
+  one_color_all(0,0,0); LEDS.show();
+  thisdelay = 100; thishue = 0;
+  for(int i=0; i<r*3; i++) {kitt();}
+  one_color_all(0,0,0); LEDS.show();
+  thisdelay = 30; thishue = 95;
+  for(int i=0; i<r*25; i++) {matrix();}
+  one_color_all(0,0,0); LEDS.show();
+}
+
+void change_mode(int newmode){
+  thissat = 255;
+  switch (newmode) {
+    case 0: one_color_all(0,0,0); LEDS.show(); break;   //---ALL OFF
+    case 1: one_color_all(255,255,255); LEDS.show(); break;   //---ALL ON
+    case 2: thisdelay = 20; break;                      //---STRIP RAINBOW FADE
+    case 3: thisdelay = 20; thisstep = 10; break;       //---RAINBOW LOOP
+    case 4: thisdelay = 20; break;                      //---RANDOM BURST
+    case 5: thisdelay = 20; thishue = 0; break;         //---CYLON v1
+    case 6: thisdelay = 40; thishue = 0; break;         //---CYLON v2
+    case 7: thisdelay = 40; thishue = 0; break;         //---POLICE LIGHTS SINGLE
+    case 8: thisdelay = 40; thishue = 0; break;         //---POLICE LIGHTS SOLID
+    case 9: thishue = 160; thissat = 50; break;         //---STRIP FLICKER
+    case 10: thisdelay = 15; thishue = 0; break;        //---PULSE COLOR BRIGHTNESS
+    case 11: thisdelay = 15; thishue = 0; break;        //---PULSE COLOR SATURATION
+    case 12: thisdelay = 60; thishue = 180; break;      //---VERTICAL SOMETHING
+    case 13: thisdelay = 100; break;                    //---CELL AUTO - RULE 30 (RED)
+    case 14: thisdelay = 40; break;                     //---MARCH RANDOM COLORS
+    case 15: thisdelay = 80; break;                     //---MARCH RWB COLORS
+    case 16: thisdelay = 60; thishue = 95; break;       //---RADIATION SYMBOL
+    //---PLACEHOLDER FOR COLOR LOOP VAR DELAY VARS
+    case 19: thisdelay = 35; thishue = 180; break;      //---SIN WAVE BRIGHTNESS
+    case 20: thisdelay = 100; thishue = 0; break;       //---POP LEFT/RIGHT
+    case 21: thisdelay = 100; thishue = 180; break;     //---QUADRATIC BRIGHTNESS CURVE
+    //---PLACEHOLDER FOR FLAME VARS
+    case 23: thisdelay = 50; thisstep = 15; break;      //---VERITCAL RAINBOW
+    case 24: thisdelay = 50; break;                     //---PACMAN
+    case 25: thisdelay = 35; break;                     //---RANDOM COLOR POP
+    case 26: thisdelay = 25; thishue = 0; break;        //---EMERGECNY STROBE
+    case 27: thisdelay = 25; thishue = 0; break;        //---RGB PROPELLER
+    case 28: thisdelay = 100; thishue = 0; break;       //---KITT
+    case 29: thisdelay = 50; thishue = 95; break;       //---MATRIX RAIN
+    case 50: thisdelay = 100; break;                    //---MARCH STRIP NOW CCW
+    case 51: thisdelay = 100; break;                    //---MARCH STRIP NOW CCW  
+    case 88: thisdelay = 5; break;                      //---NEW RAINBOW LOOP
+    case 101: one_color_all(255,0,0); LEDS.show(); break;   //---ALL RED
+    case 102: one_color_all(0,255,0); LEDS.show(); break;   //---ALL GREEN
+    case 103: one_color_all(0,0,255); LEDS.show(); break;   //---ALL BLUE
+    case 104: one_color_all(255,255,0); LEDS.show(); break;   //---ALL COLOR X
+    case 105: one_color_all(0,255,255); LEDS.show(); break;   //---ALL COLOR Y
+    case 106: one_color_all(255,0,255); LEDS.show(); break;   //---ALL COLOR Z
+  }
+  bouncedirection = 0;
+  one_color_all(0,0,0);
+  ledMode = newmode;
 }
 
 
 //------------------SETUP------------------
 void setup()  
 {
+  Serial.begin(SERIAL_BAUDRATE);      // SETUP HARDWARE SERIAL (USB)
+  Serial.setTimeout(SERIAL_TIMEOUT);
 
-  Serial.begin(9600);      // SETUP HARDWARE SERIAL (USB)
-  //Serial.begin(115200);      // SETUP HARDWARE SERIAL (USB)
+  btSerial.begin(SERIAL_BAUDRATE);    // SETUP SOFTWARE SERIAL (USB)
+  btSerial.setTimeout(SERIAL_TIMEOUT);
 
-  LEDS.setBrightness(128); // SET BRIGHTNESS TO 1/2 POWER
+  LEDS.setBrightness(max_bright);
 
-  //LEDS.addLeds<WS2811, 13>(leds, NUM_LEDS);
-  //LEDS.addLeds<TM1809, 13>(leds, NUM_LEDS);
-  //LEDS.addLeds<UCS1903, 13>(leds, NUM_LEDS);
-  //LEDS.addLeds<TM1803, 13>(leds, NUM_LEDS);
-  //LEDS.addLeds<LPD8806>(leds, NUM_LEDS)->clearLeds(300);
-  
-  //LEDS.addLeds<WS2801>(leds, NUM_LEDS);
-  //---Put ws2801 strip on the hardware SPI pins with a BGR ordering of rgb and limited to a 1Mhz data rate
-  //LEDS.addLeds<WS2801, 11, 13, BGR, DATA_RATE_MHZ(1)>(leds, NUM_LEDS);
-  //LEDS.addLeds<WS2801, RBG>(leds, NUM_LEDS);
-  
-  LEDS.addLeds<WS2811, CONTROL_PIN, GRB>(leds, NUM_LEDS);
-  
-  //LEDS.addLeds<SM16716>(leds, NUM_LEDS);
-  //LEDS.addLeds<WS2811, 11>(leds, NUM_LEDS);
-  //LEDS.addLeds<LPD8806, 10, 11>(leds, NUM_LEDS);
-  //LEDS.addLeds<WS2811, 13, BRG>(leds, NUM_LEDS);
-  //LEDS.addLeds<LPD8806, BGR>(leds, NUM_LEDS);
-  
-  sCmd.addCommand("m",   set_mode_strip);
-  sCmd.addDefaultHandler(unrecognized);      // Handler for command that isn't matched  (says "What?")
-  
-  one_color_all(0,0,0); //-BLANK STRIP
-  
-  LEDS.show();  
+  //LEDS.addLeds<SM16716>(leds, LED_COUNT);
+  //LEDS.addLeds<UCS1903, 13>(leds, LED_COUNT);
+  //LEDS.addLeds<LPD8806, 10, 11 BGR>(leds, LED_COUNT);
+  //LEDS.addLeds<TM1809, 13>(leds, LED_COUNT);
+  //LEDS.addLeds<WS2801, LED_CK, LED_DT, RBG, DATA_RATE_MHZ(1)>(leds, LED_COUNT);
+  LEDS.addLeds<WS2811, LED_DT, GRB>(leds, LED_COUNT);
+
+  one_color_all(0,0,0); //-CLEAR STRIP
+  LEDS.show();
   Serial.println("---SETUP COMPLETE---");
-  delay(1000);
-}
-
-
-
-void set_mode_strip() {    //-SETS THE MODE (SOME MODES REQUIRE RANDOM STARTS TO WORK RIGHT
-  char *arg;
-  arg = sCmd.next();
   
-  if (arg != NULL) {
-    ledMode = atoi(arg);
-  }
-  if (ledMode == 13) {  //-FOR CELL AUTO
-    random_red();
-  }
-  
-  Serial.print("~~~***NEW MODE-");
-  Serial.println(ledMode);
+  btSerial.println("---BT SETUP COMPLETE---");
 }
-
-void demo_mode(){
-  int r = 10;
-  for(int i=0; i<r*3; i++) {one_color_all(255,255,255);}
-  for(int i=0; i<r*25; i++) {rainbow_fade(20);}
-  for(int i=0; i<r*20; i++) {rainbow_loop(10, 20);}
-  for(int i=0; i<r*20; i++) {random_burst(20);}
-  for(int i=0; i<r*12; i++) {color_bounce(20);}
-  for(int i=0; i<r*12; i++) {color_bounceFADE(40);}
-  for(int i=0; i<r*5; i++) {police_lightsONE(40);}
-  for(int i=0; i<r*5; i++) {police_lightsALL(40);}
-  for(int i=0; i<r*35; i++) {flicker(200, 255);}
-  for(int i=0; i<r*50; i++) {pulse_one_color_all(0, 10);}
-  for(int i=0; i<r*35; i++) {pulse_one_color_all_rev(0, 10);}
-  for(int i=0; i<r*5; i++) {fade_vertical(240, 60);}
-  random_red();
-  for(int i=0; i<r*5; i++) {rule30(100);}
-  for(int i=0; i<r*8; i++) {random_march(30);}
-  for(int i=0; i<r*5; i++) {rwb_march(80);}
-  one_color_all(0,0,0);
-  for(int i=0; i<r*15; i++) {radiation(120, 60);}
-  for(int i=0; i<r*15; i++) {color_loop_vardelay();}
-  for(int i=0; i<r*5; i++) {white_temps();}
-  for(int i=0; i<r; i++) {sin_bright_wave(240, 35);}
-  for(int i=0; i<r*5; i++) {pop_horizontal(300, 100);}
-  for(int i=0; i<r*5; i++) {quad_bright_curve(240, 100);}
-  for(int i=0; i<r*3; i++) {flame();}
-  for(int i=0; i<r*10; i++) {pacman(50);}
-  for(int i=0; i<r*15; i++) {rainbow_vertical(15, 50);}
-
-  for(int i=0; i<r*3; i++) {strip_march_ccw(100);}
-  for(int i=0; i<r*3; i++) {strip_march_cw(100);}
-  for(int i=0; i<r*2; i++) {one_color_all(255,0,0);}
-  for(int i=0; i<r*2; i++) {one_color_all(0,255,0);}
-  for(int i=0; i<r*2; i++) {one_color_all(0,0,255);}
-  for(int i=0; i<r*2; i++) {one_color_all(255,255,0);}
-  for(int i=0; i<r*2; i++) {one_color_all(0,255,255);}
-  for(int i=0; i<r*2; i++) {one_color_all(255,0,255);}
-}
-
-
 
 
 //------------------MAIN LOOP------------------
 void loop() {
-  
-  sCmd.readSerial();     //-PROCESS SERIAL COMMANDS
-  
-  if (ledMode == 0) {one_color_all(0,0,0);}            //---STRIP OFF - "0"
-  if (ledMode == 1) {one_color_all(255,255,255);}      //---STRIP SOLID WHITE
-  if (ledMode == 2) {rainbow_fade(20);}                //---STRIP RAINBOW FADE
-  if (ledMode == 3) {rainbow_loop(10, 20);}            //---RAINBOW LOOP
-  if (ledMode == 4) {random_burst(20);}                //---RANDOM
-  if (ledMode == 5) {color_bounce(20);}                //---CYLON v1
-  if (ledMode == 6) {color_bounceFADE(20);}            //---CYLON v2
-  if (ledMode == 7) {police_lightsONE(40);}            //---POLICE SINGLE
-  if (ledMode == 8) {police_lightsALL(40);}            //---POLICE SOLID
-  if (ledMode == 9) {flicker(200,255);}                //---STRIP FLICKER 
-  if (ledMode == 10) {pulse_one_color_all(0, 10);}     //--- PULSE COLOR BRIGHTNESS
-  if (ledMode == 11) {pulse_one_color_all_rev(0, 10);} //--- PULSE COLOR SATURATION   
-  if (ledMode == 12) {fade_vertical(240, 60);}         //--- VERTICAL SOMETHING
-  if (ledMode == 13) {rule30(100);}                    //--- CELL AUTO - RULE 30 (RED)
-  if (ledMode == 14) {random_march(30);}               //--- MARCH RANDOM COLORS
-  if (ledMode == 15) {rwb_march(50);}                  //--- MARCH RWB COLORS
-  if (ledMode == 16) {radiation(120, 60);}             //--- RADIATION SYMBOL (OR SOME APPROXIMATION)
-  if (ledMode == 17) {color_loop_vardelay();}          //--- VARIABLE DELAY LOOP
-  if (ledMode == 18) {white_temps();}                  //--- WHITE TEMPERATURES
-  if (ledMode == 19) {sin_bright_wave(240, 35);}       //--- SIN WAVE BRIGHTNESS
-  if (ledMode == 20) {pop_horizontal(300, 100);}       //--- POP LEFT/RIGHT
-  if (ledMode == 21) {quad_bright_curve(240, 100);}    //--- QUADRATIC BRIGHTNESS CURVE  
-  if (ledMode == 22) {flame();}                        //--- FLAME-ISH EFFECT
-  if (ledMode == 23) {rainbow_vertical(10, 20);}       //--- VERITCAL RAINBOW
-  if (ledMode == 24) {pacman(100);}                     //--- PACMAN
+    switch (ledMode) {
+      case 999: break;
+      case  2: rainbow_fade(); break;
+      case  3: rainbow_loop(); break;
+      case  4: random_burst(); break;
+      case  5: color_bounce(); break;
+      case  6: color_bounceFADE(); break;
+      case  7: ems_lightsONE(); break;
+      case  8: ems_lightsALL(); break;
+      case  9: flicker(); break;
+      case 10: pulse_one_color_all(); break;
+      case 11: pulse_one_color_all_rev(); break;
+      case 12: fade_vertical(); break;
+      case 13: rule30(); break;
+      case 14: random_march(); break;
+      case 15: rwb_march(); break;
+      case 16: radiation(); break;
+      case 17: color_loop_vardelay(); break;
+      case 18: white_temps(); break;
+      case 19: sin_bright_wave(); break;
+      case 20: pop_horizontal(); break;
+      case 21: quad_bright_curve(); break;
+      case 22: flame(); break;
+      case 23: rainbow_vertical(); break;
+      case 24: pacman(); break;
+      case 25: random_color_pop(); break;
+      case 26: ems_lightsSTROBE(); break;
+      case 27: rgb_propeller(); break;
+      case 28: kitt(); break;
+      case 29: matrix(); break;      
+      case 50: strip_march_ccw(); break;
+      case 51: strip_march_cw(); break;  
+      case 88: new_rainbow_loop(); break;
+      case 888: demo_modeA(); break;
+      case 889: demo_modeB(); break;      
+    }
 
-  if (ledMode == 98) {strip_march_ccw(100);}           //--- MARCH WHATEVERS ON THE STRIP NOW CC-W
-  if (ledMode == 99) {strip_march_cw(100);}            //--- MARCH WHATEVERS ON THE STRIP NOW C-W
+  //---PROCESS HARDWARE SERIAL COMMANDS AND ARGS
+  while (Serial.available() > 0) {inbyte = Serial.read();
+    switch(inbyte) {
+    case 59: break; //---BREAK IF INBYTE = ';'
+    case 108:      //---"l" - SET SINGLE LED VALUE RGB
+      thisindex = Serial.parseInt();
+      thisRED = Serial.parseInt();
+      thisGRN = Serial.parseInt();
+      thisBLU = Serial.parseInt();      
+      if (ledMode != 999) {
+        ledMode = 999;
+        one_color_all(0,0,0);}        
+      leds[thisindex].setRGB( thisRED, thisGRN, thisBLU);
+      break;
+    case 118:      //---"v" - SET SINGLE LED VALUE HSV
+      thisindex = Serial.parseInt();
+      thishue = Serial.parseInt();
+      thissat = Serial.parseInt();
+      //thisVAL = Serial.parseInt();      
+      if (ledMode != 999) {
+        ledMode = 999;
+        one_color_all(0,0,0);}
+      leds[thisindex] = CHSV(thishue, thissat, 255);
+      break;      
+    case 100:      //---"d" - SET DELAY VAR
+      thisarg = Serial.parseInt();
+      thisdelay = thisarg;
+      break;
+    case 115:      //---"s" - SET STEP VAR
+      thisarg = Serial.parseInt();
+      thisstep = thisarg;
+      break;
+    case 104:      //---"h" - SET HUE VAR
+      thisarg = Serial.parseInt();
+      thishue = thisarg;
+      break;
+    case 116:      //---"t" - SET SATURATION VAR
+      thisarg = Serial.parseInt();
+      thissat = thisarg;
+      break;
+    case 98:      //---"b" - SET MAX BRIGHTNESS
+      max_bright = Serial.parseInt();
+      LEDS.setBrightness(max_bright);
+      break;      
+    case 109:      //---"m" - SET MODE
+      thisarg = Serial.parseInt();      
+      change_mode(thisarg);
+      break;
+    case 99:      //---"c" - CLEAR STRIP
+      one_color_all(0,0,0);
+      break;
+    case 97:      //---"a" - SET ALL TO ONE COLOR BY HSV 0-255
+      thisarg = Serial.parseInt();
+      one_color_allHSV(thisarg);
+      break;
+    case 122:      //---"z" - COMMAND TO 'SHOW' LEDS
+      LEDS.show();
+      break;
+    case 81:      //---"Q" - COMMAND RETURN VERSION NUMBER
+      Serial.print(VERSION_NUMBER);
+      break;
+    }
+  }
 
-  if (ledMode == 101) {one_color_all(255,0,0);}    //---101- STRIP SOLID RED
-  if (ledMode == 102) {one_color_all(0,255,0);}    //---102- STRIP SOLID GREEN
-  if (ledMode == 103) {one_color_all(0,0,255);}    //---103- STRIP SOLID BLUE
-  if (ledMode == 104) {one_color_all(255,255,0);}  //---104- STRIP SOLID YELLOW
-  if (ledMode == 105) {one_color_all(0,255,255);}  //---105- STRIP SOLID TEAL?
-  if (ledMode == 106) {one_color_all(255,0,255);}  //---106- STRIP SOLID VIOLET?
-  
-  if (ledMode == 888) {demo_mode();}               
-
+  //---PROCESS SOFTWARE SERIAL COMMANDS AND ARGS
+  while (btSerial.available() > 0) {
+    inbyte = btSerial.read();
+    if (btSerial.overflow()){Serial.println("SoftwareSerial overflow!");}
+    switch(inbyte) {
+    case 59: break; //---BREAK IF INBYTE = ';'
+    case 108:      //---"l" - SET SINGLE LED VALUE
+      thisindex = btSerial.parseInt();
+      thisRED = btSerial.parseInt();
+      thisGRN = btSerial.parseInt();
+      thisBLU = btSerial.parseInt();      
+      if (ledMode != 999) {
+        ledMode = 999;
+        one_color_all(0,0,0);}        
+      leds[thisindex].setRGB( thisRED, thisGRN, thisBLU);
+      break;
+    case 100:      //---"d" - SET DELAY VAR
+      thisarg = btSerial.parseInt();
+      thisdelay = thisarg;
+      break;
+    case 115:      //---"s" - SET STEP VAR
+      thisarg = btSerial.parseInt();
+      thisstep = thisarg;
+      break;
+    case 104:      //---"h" - SET HUE VAR
+      thisarg = btSerial.parseInt();
+      thishue = thisarg;
+      break;
+    case 116:      //---"t" - SET SATURATION VAR
+      thisarg = btSerial.parseInt();
+      thissat = thisarg;
+      break;
+    case 98:      //---"b" - SET MAX BRIGHTNESS
+      max_bright = btSerial.parseInt();
+      LEDS.setBrightness(max_bright);
+      break;      
+    case 109:      //---"m" - SET MODE
+      thisarg = btSerial.parseInt();      
+      change_mode(thisarg);
+      break;
+    case 99:      //---"c" - CLEAR STRIP
+      one_color_all(0,0,0);
+      break;
+    case 97:      //---"a" - SET ALL TO ONE COLOR BY HSV 0-255
+      thisarg = btSerial.parseInt();
+      one_color_allHSV(thisarg);
+      break;
+    case 122:      //---"z" - COMMAND TO 'SHOW' LEDS
+      LEDS.show();
+      break;        
+    }
+  }
 }
-
-
-// GETS CALLED BY SERIALCOMMAND WHEN NO MATCHING COMMAND
-void unrecognized() {
-  Serial.println("nothin fo ya...");
-}
-
