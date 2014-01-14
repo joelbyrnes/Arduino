@@ -11,3 +11,5 @@ adafruitMAX6675/
 bitlash2pt0RC4/
 bma180/
 jeelib/
+*.zip
+*.tar.gz
