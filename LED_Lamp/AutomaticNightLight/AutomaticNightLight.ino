@@ -7,6 +7,8 @@
 
 // http://www.instructables.com/id/Automatic-Hallway-Runner-Lights/step2/Program-the-Arduino/
 
+#include <TimerOne.h>
+
 // Constants won't change. They're used here to set pin numbers and thresholds:
 const int motionPin = A3;
 const int lightAnalogPin = A0;
@@ -14,6 +16,8 @@ const int ledPin = 10;
 const int LIGHT_THRESH = 800;
 const int MOTION_THRESH = 100;
 const int TIMEOUT = 1000;
+const int pwmPeriod = 500;
+const int maxBrightness = 512; // of 1024
 const boolean invertPWM = true;
 
 // variables will change:
@@ -23,6 +27,8 @@ int LEDActive = 0; // if LEDs are on
 int LEDBrightness = 0; // current LED brightness (for fade in/out)
 
 void setup() {
+  Timer1.initialize(pwmPeriod); // init timer control library for pins 9 & 10
+
   // lights off to start with
   setLight(0);
   pinMode(ledPin, OUTPUT);
@@ -34,7 +40,7 @@ void setup() {
   // set up input pins
   pinMode(lightAnalogPin, INPUT);
   pinMode(motionPin, INPUT);
-    
+      
   Serial.begin(57600);
   
 //  Serial.print("waiting for PIR to warm up... ");
@@ -69,8 +75,8 @@ void loop(){
     LEDActive = false;
   }
   if (LEDActive) {
-    if (LEDBrightness < 255) {
-      LEDBrightness = min(LEDBrightness + 1, 255);
+    if (LEDBrightness < maxBrightness) {
+      LEDBrightness = min(LEDBrightness + 1, maxBrightness);
     }
   } else {
     if (LEDBrightness > 0) {
@@ -79,8 +85,8 @@ void loop(){
   }
   
   // use parabola to bring up brightness more slowly at first
-  // y = x^2 / 255
-  int parabolicBrightness = int((double(LEDBrightness) * double(LEDBrightness)) / 255.0);
+  // y = x^2 / maxBrightness
+  int parabolicBrightness = int((double(LEDBrightness) * double(LEDBrightness)) / double(maxBrightness));
 
   Serial.print(",\t motion: ");
   Serial.print(motionState);
@@ -97,10 +103,10 @@ void loop(){
 }
 
 void setLight(int value) {
-  if (value > 255) value = 255;
+  if (value > maxBrightness) value = 1024;
   if (value < 0) value = 0;
-  if (invertPWM) analogWrite(ledPin, 255 - value);
-  else analogWrite(ledPin, value);
+  if (invertPWM) Timer1.pwm(ledPin, 1024 - value); 
+  else Timer1.pwm(ledPin, value); 
 }
 
 
