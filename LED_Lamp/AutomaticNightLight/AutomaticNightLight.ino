@@ -12,8 +12,8 @@
 #include <Ports.h>
 
 #define LOOP_DELAY 20
-#define WAIT_TIME 1000
-#define HIBERNATE_TIME 30000
+#define WAIT_TIME 500
+#define HIBERNATE_TIME 20000
 #define LED_PIN 10
 #define PIR_PIN A3
 #define LDR_POWER_PIN 12
@@ -28,7 +28,7 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 ISR(PCINT2_vect) {}
 
 // Constants won't change. They're used here to set pin numbers and thresholds:
-const int LIGHT_THRESH = 800;
+const int LIGHT_THRESH = 1000;
 const int MOTION_THRESH = 100;
 const int TIMEOUT = 1000;
 const int pwmPeriod = 500; // in microseconds
