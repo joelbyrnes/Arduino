@@ -12,7 +12,7 @@
 #include <Ports.h>
 
 #define LOOP_DELAY 20
-#define WAIT_TIME 500
+#define WAIT_TIME 200
 #define HIBERNATE_TIME 20000
 #define LED_PIN 10
 #define PIR_PIN A3
@@ -29,13 +29,15 @@ ISR(PCINT2_vect) {}
 
 // Constants won't change. They're used here to set pin numbers and thresholds:
 const int LIGHT_THRESH = 1000;
-const int MOTION_THRESH = 100;
+const int MOTION_THRESH = 150;
+
 const int TIMEOUT = 1000;
 const int pwmPeriod = 500; // in microseconds
 const int maxBrightness = 512; // of 1024
 const boolean invertPWM = true;
 
 // variables will change:
+int motionValue = 1000;
 int motionState = 0; // countdown after last motion
 int lightState = 0; // countdown after last dark
 int LEDActive = 0; // if LEDs are on
@@ -80,7 +82,7 @@ void loop(){
     Serial.print("cell: ");
     Serial.print(analogRead(LDR_INPUT_PIN));
     Serial.print(",\t pir: ");
-    Serial.print(analogRead(PIR_PIN));
+    Serial.print(motionValue);
   }
 
   if (motionState && (lightState || LEDActive)) {    
@@ -156,7 +158,9 @@ boolean isLight() {
 }
 
 boolean motionDetected() {
-  return analogRead(PIR_PIN) < MOTION_THRESH;
+  int value = analogRead(PIR_PIN);
+  motionValue = int(double(motionValue) * 0.9 + double(value) * 0.1);
+  return motionValue < MOTION_THRESH;
 }
 
 void setLight(int value) {
