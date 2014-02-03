@@ -52,15 +52,15 @@ int TOP_INDEX = int(LED_COUNT/2);
 int EVENODD = LED_COUNT%2;
 struct CRGB leds[LED_COUNT];
 int ledsX[LED_COUNT][3];     //-ARRAY FOR COPYING WHATS IN THE LED STRIP CURRENTLY (FOR CELL-AUTOMATA, MARCH, ETC)
-//int ledMode = 3;           //-START IN RAINBOW LOOP
-int ledMode = 888;         //-START IN DEMO MODE
+int ledMode = 3;           //-START MODE
+//int ledMode = 888;         //-START IN DEMO MODE
 //int ledMode = 6;             //-MODE TESTING
 
-int thisdelay = 20;          //-FX LOOPS DELAY VAR
-int thisstep = 10;           //-FX LOOPS DELAY VAR
+int thisdelay = 50;          //-FX LOOPS DELAY VAR
+int thisstep = 5;           //-FX LOOPS DELAY VAR
 int thishue = 0;             //-FX LOOPS DELAY VAR
 int thissat = 255;           //-FX LOOPS DELAY VAR
-int max_bright = 64;         //-SET MAX BRIGHTNESS TO 1/4
+int max_bright = 255;         //-SET MAX BRIGHTNESS TO 1/4
 
 int thisindex = 0;           //-SET SINGLE LED VAR
 int thisRED = 0;
@@ -382,13 +382,13 @@ void rwb_march() {                    //-m15-R,W,B MARCH CCW
       leds[0].b = 0;
     break;
     case 1:
-      leds[0].r = 255;
+      leds[0].r = 0;
       leds[0].g = 255;
-      leds[0].b = 255;
+      leds[0].b = 0;
     break;
     case 2:
-      leds[0].r = 0;
-      leds[0].g = 0;
+      leds[0].r = 255;
+      leds[0].g = 255;
       leds[0].b = 255;
     break;
   }
@@ -669,10 +669,81 @@ void strip_march_ccw() {                        //-m51-MARCH STRIP CCW
   delay(thisdelay);
 }
 
-void new_rainbow_loop(){                       //-m88-RAINBOW FADE FROM FAST_SPI2
+void rainbow_rotate(){                       //-m88-RAINBOW FADE FROM FAST_SPI2 in rotation
   ihue -= 1;
-  fill_rainbow( leds, LED_COUNT, ihue );
+  fill_rainbow2( leds, LED_COUNT, ihue, 256.0/double(LED_COUNT) );
   LEDS.show();
+  delay(thisdelay);
+}
+
+void fill_rainbow2( struct CRGB * pFirstLED, int numToFill,
+                  uint8_t initialhue,
+                  double deltahue ) {
+    CHSV hsv;
+    double doublehue = double(initialhue);
+    hsv.hue = initialhue;
+    hsv.val = 255;
+    hsv.sat = 255;
+    for( int i = 0; i < numToFill; i++) {
+        hsv.hue = int(doublehue);
+        hsv2rgb_rainbow( hsv, pFirstLED[i]);
+        doublehue += deltahue;
+    }
+}
+
+void xmas_colours_vertical() {                        // from -m23-RAINBOW 'UP' THE LOOP
+  idex++;
+  if (idex > TOP_INDEX) {idex = 0;}  
+  ihue = ihue + thisstep;
+  if (ihue > 255) {ihue = 0;}
+  int idexA = idex;
+  int idexB = horizontal_index(idexA);
+  leds[idexA] = CHSV(ihue, thissat, 255);
+  leds[idexB] = CHSV(ihue, thissat, 255);
+  LEDS.show();  
+  delay(thisdelay);
+}
+
+void advance_leds(int number) {
+  for (int i = LED_COUNT -1; i > number - 1; i--) {
+    leds[i] = leds[i-number];
+  }
+  // leaves the first N leds as they were, ready to be overwritten
+}
+
+void symmetrical() {
+  // overwrite one side with other side's LEDS
+  //int middle = int(double(LED_COUNT) / 2.0);
+  int middle = 30;
+  //for (int i = LED_COUNT; i > middle; i--) {
+  //  leds[i] = leds[i - LED_COUNT];
+  //}
+  for (int i = 0; i < middle; i++) {
+    leds[LED_COUNT - i] = leds[i];
+  }
+}
+
+void xmas() {                    //-m9- xmas colours symmetrical down the circle
+  advance_leds(1);
+  
+  idex++;
+  if (idex > 5) {idex = 0;}
+  switch (idex) {
+    case 0:
+    case 1:
+    case 2:
+      leds[0] = CRGB(255, 0, 0);
+    break;
+    case 3:
+    case 4:
+    case 5:
+      leds[0] = CRGB(0, 240, 5);
+    break;
+  }
+  
+  symmetrical();
+
+  LEDS.show();  
   delay(thisdelay);
 }
 
@@ -725,7 +796,7 @@ void demo_modeA(){
   for(int i=0; i<r*3; i++) {strip_march_cw();}
   demo_modeB();
   thisdelay = 5;
-  for(int i=0; i<r*120; i++) {new_rainbow_loop();}
+  for(int i=0; i<r*120; i++) {rainbow_rotate();}
   one_color_all(255,0,0); LEDS.show(); delay(1200);
   one_color_all(0,255,0); LEDS.show(); delay(1200);
   one_color_all(0,0,255); LEDS.show(); delay(1200);
@@ -752,6 +823,12 @@ void demo_modeB(){
 }
 
 void change_mode(int newmode){
+  // reset animation counters
+  idex = 0;                //-LED INDEX (0 to LED_COUNT-1
+  bouncedirection = 0;     //-SWITCH FOR COLOR BOUNCE (0-1)
+  tcount = 0.0;            //-INC VAR FOR SIN LOOPS
+  lcount = 0;              //-ANOTHER COUNTING VAR
+  
   thissat = 255;
   switch (newmode) {
     case 0: one_color_all(0,0,0); LEDS.show(); break;   //---ALL OFF
@@ -763,7 +840,7 @@ void change_mode(int newmode){
     case 6: thisdelay = 40; thishue = 0; break;         //---CYLON v2
     case 7: thisdelay = 40; thishue = 0; break;         //---POLICE LIGHTS SINGLE
     case 8: thisdelay = 40; thishue = 0; break;         //---POLICE LIGHTS SOLID
-    case 9: thishue = 160; thissat = 50; break;         //---STRIP FLICKER
+    case 9: thisdelay = 90; break;         //---XMAS
     case 10: thisdelay = 15; thishue = 0; break;        //---PULSE COLOR BRIGHTNESS
     case 11: thisdelay = 15; thishue = 0; break;        //---PULSE COLOR SATURATION
     case 12: thisdelay = 60; thishue = 180; break;      //---VERTICAL SOMETHING
@@ -793,7 +870,6 @@ void change_mode(int newmode){
     case 105: one_color_all(0,255,255); LEDS.show(); break;   //---ALL COLOR Y
     case 106: one_color_all(255,0,255); LEDS.show(); break;   //---ALL COLOR Z
   }
-  bouncedirection = 0;
   one_color_all(0,0,0);
   ledMode = newmode;
 }
@@ -819,6 +895,9 @@ void setup()
 
   one_color_all(0,0,0); //-CLEAR STRIP
   LEDS.show();
+  
+  change_mode(ledMode);
+  
   Serial.println("---SETUP COMPLETE---");
   
   btSerial.println("---BT SETUP COMPLETE---");
@@ -830,13 +909,14 @@ void loop() {
     switch (ledMode) {
       case 999: break;
       case  2: rainbow_fade(); break;
-      case  3: rainbow_loop(); break;
+      case  3: rainbow_rotate(); break;
       case  4: random_burst(); break;
       case  5: color_bounce(); break;
       case  6: color_bounceFADE(); break;
       case  7: ems_lightsONE(); break;
       case  8: ems_lightsALL(); break;
-      case  9: flicker(); break;
+//      case  9: flicker(); break;
+      case  9: xmas(); break;
       case 10: pulse_one_color_all(); break;
       case 11: pulse_one_color_all_rev(); break;
       case 12: fade_vertical(); break;
@@ -859,7 +939,7 @@ void loop() {
       case 29: matrix(); break;      
       case 50: strip_march_ccw(); break;
       case 51: strip_march_cw(); break;  
-      case 88: new_rainbow_loop(); break;
+      case 88: rainbow_rotate(); break;
       case 888: demo_modeA(); break;
       case 889: demo_modeB(); break;      
     }
