@@ -64,7 +64,7 @@ void setup()
   Serial.begin(9600);
   payload.print("\0");
   payload.reset();
-  Serial.println("Internal Temperature Sensor");
+  Serial.println("DHTxx Temperature Sensor");
   myId = rf12_config();
   delay(500);
 }
