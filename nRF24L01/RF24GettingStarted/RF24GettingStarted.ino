@@ -44,13 +44,13 @@ const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
 //
 
 // The various roles supported by this sketch
-typedef enum { role_ping_out = 1, role_pong_back } role_e;
+typedef enum { role_ping_out = 1, role_pong_back, role_listener, role_echo } role_e;
 
 // The debug-friendly names of those roles
-const char* role_friendly_name[] = { "invalid", "Ping out", "Pong back"};
+const char* role_friendly_name[] = { "invalid", "Ping out", "Pong back", "Listener", "Echo"};
 
 // The default role of the current running sketch
-role_e role = role_pong_back;
+role_e role = role_echo;
 
 boolean ready = false;
 
@@ -61,8 +61,7 @@ void setup(void)
 
   printf_begin();
   printf("\n\rRF24/examples/GettingStarted/\n\r");
-  printf("ROLE: %s\n\r",role_friendly_name[role]);
-  printf("*** PRESS 'T' to begin transmitting to the other node\n\r");
+  print_role();
 
   radio.begin();
 
@@ -77,10 +76,20 @@ void setup(void)
   //
   
   if ( role == role_ping_out ) set_role_ping_out();
-  else set_role_pong_back();
+  if ( role == role_pong_back ) set_role_pong_back();
+  if ( role == role_listener ) set_role_listener();
+  if ( role == role_echo ) set_role_echo();
 
   radio.startListening();
   radio.printDetails();
+}
+
+void print_role() {
+  printf("ROLE: %s\n\r",role_friendly_name[role]);
+  printf("*** PRESS 'T' to begin transmitting to the other node\n\r");
+  printf("*** PRESS 'R' to begin receiving from the other node\n\r");
+  printf("*** PRESS 'L' to passively listen for data on pipe 0 address\n\r");
+  printf("*** PRESS 'E' to echo back strings received\n\r");
 }
 
 // This simple sketch opens two pipes for these two nodes to communicate
@@ -98,6 +107,20 @@ void set_role_ping_out() {
 void set_role_pong_back() {
   // Become the receiver (pong back)
   role = role_pong_back;
+  radio.openWritingPipe(pipes[1]);
+  radio.openReadingPipe(1, pipes[0]);
+}
+
+void set_role_listener() {
+  // Become the reader
+  role = role_listener;
+  radio.openWritingPipe(pipes[1]);
+  radio.openReadingPipe(1, pipes[0]);
+}
+
+void set_role_echo() {
+  // Become the echo
+  role = role_echo;
   radio.openWritingPipe(pipes[1]);
   radio.openReadingPipe(1, pipes[0]);
 }
@@ -142,6 +165,10 @@ void loop(void) {
   //
   if ( role == role_pong_back ) pong_back();
 
+  if ( role == role_listener ) listener();
+
+  if ( role == role_echo ) echo();
+
   //
   // Change roles
   //
@@ -149,19 +176,37 @@ void loop(void) {
   if ( Serial.available() )
   {
     char c = toupper(Serial.read());
-    if ( c == 'T' && role == role_pong_back )
+    if ( c == 'T' && role != role_ping_out )
     {
-      printf("*** CHANGING TO TRANSMIT ROLE -- PRESS 'R' TO SWITCH BACK\n\r");
+      printf("*** CHANGING ");
 
       // Become the transmitter (ping out)
       set_role_ping_out();
+      print_role();
     }
-    else if ( c == 'R' && role == role_ping_out )
+    else if ( c == 'R' && role != role_pong_back )
     {
-      printf("*** CHANGING TO RECEIVE ROLE -- PRESS 'T' TO SWITCH BACK\n\r");
+      printf("*** CHANGING ");
 
       // Become the receiver (pong back)
       set_role_pong_back();
+      print_role();
+    }
+    else if ( c == 'L' && role != role_listener )
+    {
+      printf("*** CHANGING ");
+
+      // echo back strings
+      set_role_listener();
+      print_role();
+    }
+    else if ( c == 'E' && role != role_echo )
+    {
+      printf("*** CHANGING ");
+
+      // echo back strings
+      set_role_echo();
+      print_role();
     }
   }
 }
@@ -203,8 +248,6 @@ void ping_out() {
 
     // Spew it
     printf("Got response %lu, round-trip delay: %lu\n\r",got_time,millis()-got_time);
-    
-    delay(5);
   }
 
   // Try again 1s later
@@ -232,6 +275,53 @@ void pong_back() {
     // Send the final one back.
     radio.write( &got_time, sizeof(unsigned long) );
     printf("Sent response.\n\r");
+
+    // Now, resume listening so we catch the next packets.
+    radio.startListening();
+  }
+}
+
+void* buf[100];
+
+void listener() {
+  // if there is data ready
+  if ( radio.available() ) {
+    bool done = false;
+    while (!done)
+    {
+      // Fetch the payload, and see if this was the last one.
+      done = radio.read( buf, sizeof(buf) );
+
+      // Spew it
+      printf("Recevied: '%s'\n", buf);
+    }
+  }
+}
+
+void echo() {
+  // if there is data ready
+  // if there is data ready
+  if ( radio.available() ) {
+    bool done = false;
+    while (!done)
+    {
+      // Fetch the payload, and see if this was the last one.
+      done = radio.read( buf, sizeof(buf) );
+
+      // Spew it
+      printf("Recevied: '%s'... ", buf);
+    }
+
+    // First, stop listening so we can talk
+    radio.stopListening();
+         
+    printf("echoing it back... ");
+    bool ok = radio.write( buf, strlen((const char*) buf) );
+
+    if (ok)
+      printf("ok.\n");
+    else
+      printf("failed.\n\r");
 
     // Now, resume listening so we catch the next packets.
     radio.startListening();
