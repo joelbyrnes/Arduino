@@ -2,6 +2,8 @@
 #include <RF12.h>
 #include <RF12sio.h>
 
+#define DEBUG 0
+
 #define NODE_A 1
 #define NODE_B 2
 #define NODE_Z 26
@@ -66,33 +68,53 @@ void setup()
   payload.reset();
   Serial.println("DHTxx Temperature Sensor");
   myId = rf12_config();
+  Serial.print("DEBUG=");
+  Serial.println(DEBUG);
   delay(500);
 }
 
 void loop() {
-  double oldTemp = GetTemp();
-  Serial.print("internal temp = ");
-  Serial.println(oldTemp);
+  if (DEBUG) {
+    double oldTemp = GetTemp();
+    Serial.print("internal temp = ");
+    Serial.println(oldTemp);
+  }
 
   int t, h;
   if (dht.reading(t, h)) {
     double temp = t / 10.0;
     double humid = h / 10.0;
-    Serial.print("temperature = ");
-    Serial.println(temp);
-    Serial.print("humidity = ");
-    Serial.println(humid);
-    Serial.println();
-    delay(500);
+    analogRead(A3); // throw it away to settle ADC
+    int batteryVal = analogRead(A3);
+    double battery = batteryVal / 1024.0 * 3.3;
+    
+    if (DEBUG) {
+      Serial.print("temperature = ");
+      Serial.println(temp);
+      Serial.print("humidity = ");
+      Serial.println(humid);
+      Serial.print("batteryVal = ");
+      Serial.println(batteryVal);
+      Serial.print("battery = ");
+      Serial.println(battery);
+      Serial.println();
+    }
 
-    payload.print("Node ");
+    payload.print("Node=");
     payload.print(myId);
-    payload.print(" Temp ");
+    payload.print(" Temp=");
     payload.print(temp);
-    payload.print(" C");
-    payload.print(" Humid ");
+    payload.print("C");
+    payload.print(" Humid=");
     payload.print(humid);
-    payload.print(" %");
+    payload.print("%");
+    payload.print(" Battery=");
+    payload.print(battery);
+    payload.print("V");
+    if (DEBUG) {
+      payload.print(" Debug=");
+      payload.print(DEBUG);
+    }
     
     // must recv to clear buffers or something
     while (!rf12_canSend())
@@ -118,14 +140,16 @@ void sendPayload(byte dest) {
 
 // must have called canSend before this
 void sendMsg(byte dest, byte *msg, byte sendLen) {
-  Serial.print(" -> ");
-  Serial.print("node ");
-  Serial.print((int) dest);  
-  Serial.print(", ");
-  Serial.print((int) sendLen);
-  Serial.print("b: '");
-  Serial.print((char*) msg);
-  Serial.println("'");
+  if (DEBUG) {
+    Serial.print(" -> ");
+    Serial.print("node ");
+    Serial.print((int) dest);  
+    Serial.print(", ");
+    Serial.print((int) sendLen);
+    Serial.print("b: '");
+    Serial.print((char*) msg);
+    Serial.println("'");
+  }
   
   byte header;
   if (dest)
