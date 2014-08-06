@@ -28,10 +28,21 @@ void setup()
     Serial.println("setPayloadSize failed");
   if (!nrf24.setRF(NRF24::NRF24DataRate2Mbps, NRF24::NRF24TransmitPower0dBm))
     Serial.println("setRF failed");  
+
+  Serial.println("printRegisters");
+  nrf24.printRegisters();
+  Serial.println("setup complete");
 }
 
-void loop()
-{
+void loop() {
+  if (nrf24.statusRead()) {
+    Serial.println("radio ready");
+  } else {
+    Serial.println("radio not ready");
+    Serial.println(nrf24.statusRead());
+    return; 
+  } 
+  
   Serial.println("start");
  
   // Configure for carrier wave:

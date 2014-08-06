@@ -50,7 +50,7 @@ typedef enum { role_ping_out = 1, role_pong_back, role_listener, role_echo } rol
 const char* role_friendly_name[] = { "invalid", "Ping out", "Pong back", "Listener", "Echo"};
 
 // The default role of the current running sketch
-role_e role = role_echo;
+role_e role = role_listener;
 
 boolean ready = false;
 
@@ -128,7 +128,7 @@ void set_role_echo() {
 boolean radioConnected() {
   printf("PayloadSize = %i \n", radio.getPayloadSize()); // appears to be stored in library
   printf("CRCLength = %i \n", radio.getCRCLength());
-  printf("DynamicPayloadSize = %i \n", radio.getDynamicPayloadSize());
+  printf("DynamicPayloadSize = %i \n", radio.getDynamicPayloadSize()); // sometimes this starts as 0
   printf("isPVariant = %i \n", radio.isPVariant());
   printf("PALevel = %i \n", radio.getPALevel());
   
@@ -136,7 +136,7 @@ boolean radioConnected() {
   // TODO write something and see if it appears to send?
 
   // try to read values from the radio to determine if it is even connected, assuming these are all configured > 0
-  if (radio.getCRCLength() && radio.getDynamicPayloadSize() && radio.isPVariant() && radio.getPALevel()) {
+  if (radio.getCRCLength() && radio.isPVariant() && radio.getPALevel()) {
     return true;
   } 
   return false;
