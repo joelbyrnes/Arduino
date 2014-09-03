@@ -1,0 +1,9 @@
+[submodule "libraries.attiny85/RF24"]
+	path = libraries.attiny85/RF24
+	url = https://github.com/jscrane/RF24
+[submodule "libraries.attiny85/RF24Network"]
+	path = libraries.attiny85/RF24Network
+	url = https://github.com/jscrane/RF24Network
+[submodule "libraries.attiny85/SPI"]
+	path = libraries.attiny85/SPI
+	url = https://github.com/jscrane/SPI
