@@ -1,6 +1,23 @@
 /*
   Program for Scott Moorhead's "zen" board
 
+A :  3   4   5   6   7   8   3   (repeat)   36
+B :  4   5   6   7   8   3   4   (repeat)   37
+C :  5   6   7   8   3   4   5   (repeat)   38
+D :  6   7   8   3   4   5   6   (repeat)   39
+E :  7   8   3   4   5   6   7   (repeat)   40
+F :  8   3   4   5   6   7   8   (repeat)   41 
+
+move 90 degrees after x minutes. 
+
+p0    p1    p2    p3    p0    p1    p2    p3     p0?
+
+A :  3     4     5     6     7     8     3 
+      t=3   t=7   t=12  t=18  t=25  t=33  t=36
+B :  4     5     6     7     8     3     4 
+      t=4   t=9   t=15  t=22  t=30  t=33  t=37
+etc
+
 */
 
 #include <AccelStepper.h>
@@ -28,9 +45,36 @@ const int ledPin = 8;
 
 int stopOnMark;
 int found;
-int stepper1Rotations = 0;
 
-MilliTimer timer1, timer2;
+// TODO remove?
+MilliTimer timer1;
+
+enum {SEQ_A, SEQ_B, SEQ_C, SEQ_D, SEQ_E, SEQ_F, PRINT_TIME, TASK_LIMIT};
+// task for homing? 
+
+Scheduler scheduler (TASK_LIMIT);
+
+const int sequenceA[] = {3, 4, 5, 6, 7, 8, 3};
+const int sequenceB[] = {4, 5, 6, 7, 8, 3, 4};
+const int sequenceC[] = {5, 6, 7, 8, 3, 4, 5};
+const int sequenceD[] = {6, 7, 8, 3, 4, 5, 6};
+const int sequenceE[] = {7, 8, 3, 4, 5, 6, 7};
+const int sequenceF[] = {8, 3, 4, 5, 6, 7, 8};
+
+int seqAPos = 0;
+int seqBPos = 0;
+int seqCPos = 0;
+int seqDPos = 0;
+int seqEPos = 0;
+int seqFPos = 0;
+
+// control how long the sequence times are, if they were in seconds
+int timeFactor = 10;
+
+unsigned int ms;
+
+// TODO remove
+int stepper1Rotations;
 
 void setup() {
   pinMode(ledPin, OUTPUT);    
@@ -43,16 +87,22 @@ void setup() {
   stepper1.setMaxSpeed(MAX_SPEED);
   stepper1.setAcceleration(800.0);
   stepper1.setSpeed(400);
+  
+  // stepper2....
+  
+  // tenths of a second, ie 5 = 0.5s
+  scheduler.timer(SEQ_A, sequenceA[seqAPos++] * timeFactor);
+//  scheduler.timer(SEQ_B, sequenceB[seqBPos++] * timeFactor); ...
+  scheduler.timer(PRINT_TIME, 10);
 
   // initially look for the home marker
   stopOnMark = 1;
 }
 
 void loop() {
+  ms = millis();
   
   int lightValue = analogRead(sensorPin);
-
-  //Serial.println(lightValue);  
 
   // light up LED if we have found the mark
   if (lightValue > lightThreshold) {
@@ -63,57 +113,98 @@ void loop() {
     found = 0;
   }
   
+  doWhatNow();
+//  OLD();
+
+  stepper1.run();
+  // stepper2.run(); ...
+}
+
+void doWhatNow() {
+  // TODO home all steppers before starting sequences
+  homing();
+  
+  if (stepper1.distanceToGo() == 0) {
+    Serial.println();
+    Serial.print("*** stepping done. rotations = ");
+    Serial.println(stepper1Rotations);
+    Serial.print("found = ");
+    Serial.println(found);
+    Serial.print("stopOnMark = ");
+    Serial.println(stopOnMark);
+  }
+  
+  switch(scheduler.poll()) {
+    case SEQ_A: 
+      Serial.print("SEQ_A pos = ");
+      Serial.println(seqAPos);
+      
+      // schedule again according to sequence
+      scheduler.timer(SEQ_A, sequenceA[seqAPos++] * timeFactor);
+      stepper1.setMaxSpeed(MAX_SPEED);
+      stepper1.move(stepsPer90Degrees);
+      
+      // wrap back to start
+      if (seqAPos == 7) seqAPos = 0;
+      break;
+
+    case PRINT_TIME: 
+      scheduler.timer(PRINT_TIME, 10);
+      Serial.println(ms);
+      break;
+  }
+  
+}
+
+void homing() {
   // seek the mark, repeatedly 
   if (stopOnMark && !found && stepper1.distanceToGo() == 0) {
-    // ensure we found the mark, start at the home
-    stopOnMark = 1;
-    // jog forward until we find it 
+    // move slowly until we find it, because motor will stop suddenly
     stepper1.setMaxSpeed(MAX_SPEED / 4);
-    stepper1.move(stepsPer90Degrees);
+    stepper1.move(stepsPer90Degrees * 4);
   }
   
   if (stopOnMark && found) {
-    // immediate halt
+    // return to position where we first found marker
     stepper1.moveTo(stepper1.currentPosition());
     stopOnMark = 0;
-    //delay(100);
   }
+}
 
+
+void OLD() {
+  homing();
+  
+  // debug
+  if (stepper1.distanceToGo() == 0) {
+    Serial.println();
+    Serial.print("*** stepping done. rotations = ");
+    Serial.println(stepper1Rotations);
+    Serial.print("found = ");
+    Serial.println(found);
+    Serial.print("stopOnMark = ");
+    Serial.println(stopOnMark);
+  }
+  
   // move 90 degrees at a time
   if (stepper1.distanceToGo() == 0) {
-    if (timer1.remaining() > 0) {
-      //Serial.print(".");
-    } else {
-      Serial.println();
-      Serial.print("*** stepping done. rotations = ");
-      Serial.println(stepper1Rotations);
-      Serial.print("found = ");
-      Serial.println(found);
-      Serial.print("stopOnMark = ");
-      Serial.println(stopOnMark);
-//      Serial.print("time remaining = ");
-//      Serial.println(timer1.remaining());
-    }
 
     if (stepper1Rotations == 4) {
       // have rotated 360 degrees
-
-      // seek to home before continuing
-      stopOnMark = 1;
-      
-      if (timer1.idle()) {
-        Serial.println();
-        Serial.println("### have turned 360 degrees. waiting.,.");
+      Serial.println();
+      if (!found) {
+        Serial.println("### have turned 360 degrees. homing now. ");
+        // seek to home before continuing
+        stopOnMark = 1;
+      } else {
+        Serial.println("### have turned 360 degrees and at home. ");
+        if (timer1.poll(2000))
+          stepper1Rotations = 0;
       }
 
-      // delay just so I can see it 
-      if (timer1.poll(2000)) {
-        stepper1Rotations = 0;
-
-      }
     } else {
+    //  rotate(stepper1);
       stepper1.setMaxSpeed(MAX_SPEED);
-      //delay(500);
       stepper1.move(stepsPer90Degrees);
       stepper1Rotations += 1;
     }      
@@ -121,6 +212,5 @@ void loop() {
     
   }
 
-  stepper1.run();
 }
 
