@@ -66,12 +66,20 @@ const int ledPin = 8;
 // HALF4WIRE or FULL4WIRE
 AccelStepper stepperA(AccelStepper::HALF4WIRE, motorPinA1, motorPinA3, motorPinA2, motorPinA4);
 AccelStepper stepperB(AccelStepper::HALF4WIRE, motorPinB1, motorPinB3, motorPinB2, motorPinB4);
+AccelStepper stepperC(AccelStepper::HALF4WIRE, motorPinC1, motorPinC3, motorPinC2, motorPinC4);
+AccelStepper stepperD(AccelStepper::HALF4WIRE, motorPinD1, motorPinD3, motorPinD2, motorPinD4);
+AccelStepper stepperE(AccelStepper::HALF4WIRE, motorPinE1, motorPinE3, motorPinE2, motorPinE4);
 AccelStepper stepperF(AccelStepper::HALF4WIRE, motorPinF1, motorPinF3, motorPinF2, motorPinF4);
+
+#define NUM_STEPPERS 6
+AccelStepper *steppers[NUM_STEPPERS] = {&stepperA, &stepperB, &stepperC, &stepperD, &stepperE, &stepperF};
 
 // according to http://42bots.com/tutorials/28byj-48-stepper-motor-with-uln2003-driver-and-arduino-uno/ 
 // this motor isn't quite 4096 steps, more like 4076. 1019 per 90 degrees.
 
 int stepsPer90Degrees = 1019;
+
+const int lightThreshold = 100;
 
 int stopAOnMark;
 int stopFOnMark;
@@ -105,10 +113,6 @@ int timeFactor = 10;
 
 unsigned int ms;
 
-// TODO remove
-int stepperARotations;
-int stepperFRotations;
-
 void setup() {
   pinMode(ledPin, OUTPUT);    
   digitalWrite(ledPin, LOW);
@@ -117,21 +121,18 @@ void setup() {
 
   delay(100);
   
-  stepperA.setMaxSpeed(MAX_SPEED);
-  stepperA.setAcceleration(800.0);
-  stepperA.setSpeed(400);
-
-  stepperB.setMaxSpeed(MAX_SPEED);
-  stepperB.setAcceleration(800.0);
-  stepperB.setSpeed(400);
-
-  stepperF.setMaxSpeed(MAX_SPEED);
-  stepperF.setAcceleration(800.0);
-  stepperF.setSpeed(400);
+  for (int i=0; i < NUM_STEPPERS; i++) {
+    steppers[i]->setMaxSpeed(MAX_SPEED);
+    steppers[i]->setAcceleration(800.0);
+    steppers[i]->setSpeed(400);  
+  }
 
   // tenths of a second, ie 5 = 0.5s
   scheduler.timer(SEQ_A, sequenceA[seqAPos++] * timeFactor);
   scheduler.timer(SEQ_B, sequenceB[seqBPos++] * timeFactor);
+  scheduler.timer(SEQ_C, sequenceB[seqCPos++] * timeFactor);
+  scheduler.timer(SEQ_D, sequenceB[seqDPos++] * timeFactor);
+  scheduler.timer(SEQ_E, sequenceB[seqEPos++] * timeFactor);
   scheduler.timer(SEQ_F, sequenceF[seqFPos++] * timeFactor);
   
   scheduler.timer(PRINT_TIME, 10);
@@ -156,81 +157,68 @@ void loop() {
   }
   
   doWhatNow();
-//  OLD();
 
   stepperA.run();
   stepperB.run();
+  stepperC.run();
+  stepperD.run();
+  stepperE.run();
   stepperF.run();
 }
 
+void schedule(AccelStepper &stepper, int task, const int sequence[], int seqPos) {
+  // schedule again according to sequence
+  scheduler.timer(task, sequence[seqPos % 7] * timeFactor);
+  stepper.enableOutputs();
+  stepper.setMaxSpeed(MAX_SPEED);
+  stepper.move(stepsPer90Degrees);
+}
+
 void doWhatNow() {
-  // TODO home all steppers before starting sequences
+  // TODO repeat for all steppers
   //homing();
   
-  if (stepperA.distanceToGo() == 0) {
-    stepperA.disableOutputs();
+  for (int i=0; i < NUM_STEPPERS; i++) {
+    if (steppers[i]->distanceToGo() == 0) {
+      steppers[i]->disableOutputs();
+    }
   }
-
-  if (stepperB.distanceToGo() == 0) {
-    stepperB.disableOutputs();
-  }
-
-  if (stepperF.distanceToGo() == 0) {
-    stepperF.disableOutputs();
-  }
-
-/*
-  Serial.print("* scheduler poll = ");
-  Serial.println(scheduler.poll(), HEX);
-  
-  if (stepperA.distanceToGo() == 0) {
-    Serial.println();
-    Serial.print("*** stepper A done. rotations = ");
-    Serial.println(stepperARotations);
-    Serial.print("foundA = ");
-    Serial.println(foundA);
-//    Serial.print("stopAOnMark = ");
-//    Serial.println(stopAOnMark);
-  }
-
-  if (stepperF.distanceToGo() == 0) {
-    Serial.println();
-    Serial.print("*** stepper F done. rotations = ");
-    Serial.println(stepperFRotations);
-    Serial.print("foundF = ");
-    Serial.println(foundF);
-//    Serial.print("stopFOnMark = ");
-//    Serial.println(stopFOnMark);
-  }
-  */
   
   switch(scheduler.poll()) {
     case SEQ_A: 
       Serial.print("SEQ_A pos = ");
       Serial.println(seqAPos);
       
-      // schedule again according to sequence
-      scheduler.timer(SEQ_A, sequenceA[seqAPos++] * timeFactor);
-      stepperA.enableOutputs();
-      stepperA.setMaxSpeed(MAX_SPEED);
-      stepperA.move(stepsPer90Degrees);
-      
-      // wrap back to start
-      if (seqAPos == 7) seqAPos = 0;
+      schedule(stepperA, SEQ_A, sequenceA, seqAPos++); 
+      //stopAOnMark = 1;
       break;
 
     case SEQ_B: 
       Serial.print("SEQ_B pos = ");
       Serial.println(seqBPos);
       
-      // schedule again according to sequence
-      scheduler.timer(SEQ_B, sequenceB[seqBPos++] * timeFactor);
-      stepperB.enableOutputs();
-      stepperB.setMaxSpeed(MAX_SPEED);
-      stepperB.move(stepsPer90Degrees);
+      schedule(stepperB, SEQ_B, sequenceB, seqBPos++); 
+      break;
+
+    case SEQ_C: 
+      Serial.print("SEQ_C pos = ");
+      Serial.println(seqCPos);
       
-      // wrap back to start
-      if (seqBPos == 7) seqBPos = 0;
+      schedule(stepperC, SEQ_C, sequenceC, seqCPos++); 
+      break;
+
+    case SEQ_D: 
+      Serial.print("SEQ_D pos = ");
+      Serial.println(seqDPos);
+      
+      schedule(stepperD, SEQ_D, sequenceD, seqDPos++); 
+      break;
+
+    case SEQ_E: 
+      Serial.print("SEQ_E pos = ");
+      Serial.println(seqEPos);
+      
+      schedule(stepperE, SEQ_E, sequenceE, seqEPos++); 
       break;
 
     case SEQ_F: 
@@ -238,13 +226,7 @@ void doWhatNow() {
       Serial.println(seqFPos);
       
       // schedule again according to sequence
-      scheduler.timer(SEQ_F, sequenceF[seqFPos++] * timeFactor);
-      stepperF.enableOutputs();
-      stepperF.setMaxSpeed(MAX_SPEED);
-      stepperF.move(stepsPer90Degrees);
-      
-      // wrap back to start
-      if (seqFPos == 7) seqFPos = 0;
+      schedule(stepperF, SEQ_F, sequenceF, seqFPos++); 
       break;
 
     case PRINT_TIME: 
@@ -256,6 +238,8 @@ void doWhatNow() {
 }
 
 void homing() {
+  stopAOnMark = stepperA.distanceToGo() < 200;
+  
   // seek the mark, repeatedly 
   if (stopAOnMark && !foundA && stepperA.distanceToGo() == 0) {
     // move slowly until we find it, because motor will stop suddenly
@@ -268,47 +252,5 @@ void homing() {
     stepperA.moveTo(stepperA.currentPosition());
     stopAOnMark = 0;
   }
-}
-
-
-void OLD() {
-  homing();
-  
-  // debug
-  if (stepperA.distanceToGo() == 0) {
-    Serial.println();
-    Serial.print("*** stepping done. rotations = ");
-    Serial.println(stepperARotations);
-    Serial.print("foundA = ");
-    Serial.println(foundA);
-    Serial.print("stopAOnMark = ");
-    Serial.println(stopAOnMark);
-  }
-  
-  // move 90 degrees at a time
-  if (stepperA.distanceToGo() == 0) {
-
-    if (stepperARotations == 1) {
-      // have rotated 90 degrees
-      Serial.println();
-      if (!foundA) {
-        Serial.println("### have turned 90 degrees. homing now. ");
-        // seek to home before continuing
-        stopAOnMark = 1;
-      } else {
-        Serial.println("### have turned 90 degrees and at home. ");
-        if (timer1.poll(2000))
-          stepperARotations = 0;
-      }
-
-    } else {
-    //  rotate(stepperA);
-      stepperA.setMaxSpeed(MAX_SPEED);
-      stepperA.move(stepsPer90Degrees);
-      stepperARotations += 1;
-    }      
-    
-  }
-
 }
 
