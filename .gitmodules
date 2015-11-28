@@ -7,3 +7,6 @@
 [submodule "libraries.attiny85/SPI"]
 	path = libraries.attiny85/SPI
 	url = https://github.com/jscrane/SPI
+[submodule "libraries.normal/RF24Network"]
+	path = libraries.normal/RF24Network
+	url = https://github.com/maniacbug/RF24Network.git
