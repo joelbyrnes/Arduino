@@ -49,9 +49,6 @@ TO DO:
 #define motorPinF3  41    
 #define motorPinF4  39   
 
-const int sensorPin = A1;    // pin that the sensor is attached to
-const int ledPin = 8;
-
 // Initialize with pin sequence IN1-IN3-IN2-IN4 for using the AccelStepper with 28BYJ-48
 // HALF4WIRE or FULL4WIRE
 AccelStepper stepperA(AccelStepper::HALF4WIRE, motorPinA1, motorPinA3, motorPinA2, motorPinA4);
@@ -85,14 +82,18 @@ struct StepperCluster {
   const int sequence[7];
   int seqPos;
   int task;
+  const int sensorPin;
+  const int ledPin;
+  boolean seeking;
+  boolean found;
 }; 
 
-StepperCluster clusterA { &stepperA, {3, 4, 5, 6, 7, 8, 3}, 0, SEQ_A };
-StepperCluster clusterB { &stepperB, {4, 5, 6, 7, 8, 3, 4}, 0, SEQ_B };
-StepperCluster clusterC { &stepperC, {5, 6, 7, 8, 3, 4, 5}, 0, SEQ_C };
-StepperCluster clusterD { &stepperD, {6, 7, 8, 3, 4, 5, 6}, 0, SEQ_D };
-StepperCluster clusterE { &stepperE, {7, 8, 3, 4, 5, 6, 7}, 0, SEQ_E };
-StepperCluster clusterF { &stepperF, {8, 3, 4, 5, 6, 7, 8}, 0, SEQ_F };
+StepperCluster clusterA { &stepperA, {3, 4, 5, 6, 7, 8, 3}, 0, SEQ_A, A1, 8,  0, 0 };
+StepperCluster clusterB { &stepperB, {4, 5, 6, 7, 8, 3, 4}, 0, SEQ_B, A2, 9,  0, 0 };
+StepperCluster clusterC { &stepperC, {5, 6, 7, 8, 3, 4, 5}, 0, SEQ_C, A3, 10, 0, 0 };
+StepperCluster clusterD { &stepperD, {6, 7, 8, 3, 4, 5, 6}, 0, SEQ_D, A4, 11, 0, 0 };
+StepperCluster clusterE { &stepperE, {7, 8, 3, 4, 5, 6, 7}, 0, SEQ_E, A5, 12, 0, 0 };
+StepperCluster clusterF { &stepperF, {8, 3, 4, 5, 6, 7, 8}, 0, SEQ_F, A6, 13, 0, 0 };
 
 StepperCluster *clusters[NUM_STEPPERS] = {&clusterA, &clusterB, &clusterC, &clusterD, &clusterE, &clusterF}; 
 
@@ -102,42 +103,47 @@ int timeFactor = 10;
 unsigned int ms;
 
 void setup() {
-  pinMode(ledPin, OUTPUT);    
-  digitalWrite(ledPin, LOW);
-  
   Serial.begin(57600); 
+
+  scheduler.timer(PRINT_TIME, 10);
   
   for (int i=0; i < NUM_STEPPERS; i++) {
+    // TODO?
+    //pinMode(ledPin, OUTPUT);
+    //digitalWrite(ledPin, LOW);
+
     // configure steppers
     clusters[i]->stepper->setMaxSpeed(MAX_SPEED);
     clusters[i]->stepper->setAcceleration(800.0);
     clusters[i]->stepper->setSpeed(400);  
+    pinMode(clusters[i]->ledPin, OUTPUT);    
+    digitalWrite(clusters[i]->ledPin, LOW);
+    
+    // initially look for the home marker
+    //clusters[i]->seeking = 1;
 
     // schedule movements in tenths of a second, ie 5 = 0.5s
-    scheduler.timer(clusters[i]->task, clusters[i]->sequence[clusters[i]->seqPos++] * timeFactor);
+    scheduler.timer(clusters[i]->task, (clusters[i]->sequence[clusters[i]->seqPos]) * timeFactor);
+    clusters[i]->seqPos++;
   }
-  
-  scheduler.timer(PRINT_TIME, 10);
-
-  // initially look for the home marker
-  //stopAOnMark = 1;
-  //stopFOnMark = 1;
 }
 
 void loop() {
   ms = millis();
   
-  int lightValue = analogRead(sensorPin);
-
-  // light up LED if we have found the mark
-  if (lightValue > lightThreshold) {
-    digitalWrite(ledPin, HIGH);
-    foundA = 1;
-  } else {
-    digitalWrite(ledPin, LOW);
-    foundA = 0;
-  }
+  for (int i=0; i < NUM_STEPPERS; i++) {
+    int lightValue = analogRead(clusters[i]->sensorPin);
   
+    // light up LED if we have found the mark
+    if (lightValue > lightThreshold) {
+      digitalWrite(clusters[i]->ledPin, HIGH);
+      clusters[i]->found = 1;
+    } else {
+      digitalWrite(clusters[i]->ledPin, LOW);
+      clusters[i]->found = 0;
+    }
+  }
+
   doWhatNow();
 
   stepperA.run();
@@ -150,70 +156,71 @@ void loop() {
 
 void schedule(struct StepperCluster &cluster) {
   // schedule again according to sequence
-  scheduler.timer(cluster.task, cluster.sequence[cluster.seqPos++ % 7] * timeFactor);
+  scheduler.timer(cluster.task, cluster.sequence[cluster.seqPos % 7] * timeFactor);
+  cluster.seqPos++;
   cluster.stepper->enableOutputs();
   cluster.stepper->setMaxSpeed(MAX_SPEED);
   cluster.stepper->move(stepsPer90Degrees);
+  cluster.seeking = 1;
 }
 
 void doWhatNow() {
-  // TODO repeat for all steppers
-  //homing();
-  
-  // save power by turning off outputs when not moving
   for (int i=0; i < NUM_STEPPERS; i++) {
+    // save power by turning off outputs when not moving
     if (clusters[i]->stepper->distanceToGo() == 0) {
       clusters[i]->stepper->disableOutputs();
     }
+    
+    // TODO 
+    //homing();
   }
   
   switch(scheduler.poll()) {
+    case PRINT_TIME: 
+      scheduler.timer(PRINT_TIME, 10);
+      Serial.println(ms);
+      break;
+
     case SEQ_A: 
       Serial.print("SEQ_A pos = ");
-      Serial.println(clusterA.seqPos);
+      Serial.println(clusterA.seqPos % 7);
       
       schedule(clusterA); 
-      //stopAOnMark = 1;
       break;
 
     case SEQ_B: 
       Serial.print("SEQ_B pos = ");
-      Serial.println(clusterB.seqPos);
+      Serial.println(clusterB.seqPos % 7);
       
       schedule(clusterB); 
       break;
 
     case SEQ_C: 
       Serial.print("SEQ_C pos = ");
-      Serial.println(clusterC.seqPos);
+      Serial.println(clusterC.seqPos % 7);
       
       schedule(clusterC); 
       break;
 
     case SEQ_D: 
       Serial.print("SEQ_D pos = ");
-      Serial.println(clusterD.seqPos);
+      Serial.println(clusterD.seqPos % 7);
       
       schedule(clusterD); 
       break;
 
     case SEQ_E: 
       Serial.print("SEQ_E pos = ");
-      Serial.println(clusterE.seqPos);
+      Serial.println(clusterE.seqPos % 7);
       
       schedule(clusterE); 
       break;
 
     case SEQ_F: 
       Serial.print("SEQ_F pos = ");
-      Serial.println(clusterF.seqPos);
+      Serial.println(clusterF.seqPos % 7);
       
       schedule(clusterF); 
-      break;
-
-    case PRINT_TIME: 
-      scheduler.timer(PRINT_TIME, 10);
-      Serial.println(ms);
       break;
   }
   
