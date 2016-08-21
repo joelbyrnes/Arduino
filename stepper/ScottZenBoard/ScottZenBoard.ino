@@ -97,8 +97,8 @@ StepperCluster clusterF { &stepperF, {8, 3, 4, 5, 6, 7, 8}, 0, SEQ_F, A6, 13, 0,
 
 StepperCluster *clusters[NUM_STEPPERS] = {&clusterA, &clusterB, &clusterC, &clusterD, &clusterE, &clusterF}; 
 
-// control how long the sequence times are, if they were in seconds. Note that scheduler works in 10ths of a second. 
-int timeFactor = 10;
+// the time between sequence steps, in seconds.
+int timeFactor = 6;
 
 unsigned int ms;
 
@@ -116,6 +116,9 @@ void setup() {
     clusters[i]->stepper->setMaxSpeed(MAX_SPEED);
     clusters[i]->stepper->setAcceleration(800.0);
     clusters[i]->stepper->setSpeed(400);  
+    // start off disabled 
+    clusters[i]->stepper->disableOutputs();
+    
     pinMode(clusters[i]->ledPin, OUTPUT);    
     digitalWrite(clusters[i]->ledPin, LOW);
     
@@ -123,7 +126,7 @@ void setup() {
     //clusters[i]->seeking = 1;
 
     // schedule movements in tenths of a second, ie 5 = 0.5s
-    scheduler.timer(clusters[i]->task, (clusters[i]->sequence[clusters[i]->seqPos]) * timeFactor);
+    scheduler.timer(clusters[i]->task, (clusters[i]->sequence[clusters[i]->seqPos]) * timeFactor * 10);
     clusters[i]->seqPos++;
   }
 }
@@ -156,7 +159,7 @@ void loop() {
 
 void schedule(struct StepperCluster &cluster) {
   // schedule again according to sequence
-  scheduler.timer(cluster.task, cluster.sequence[cluster.seqPos % 7] * timeFactor);
+  scheduler.timer(cluster.task, cluster.sequence[cluster.seqPos % 7] * timeFactor * 10);
   cluster.seqPos++;
   cluster.stepper->enableOutputs();
   cluster.stepper->setMaxSpeed(MAX_SPEED);
