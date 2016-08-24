@@ -72,11 +72,15 @@
             left:600px;
         }
 
+        .reverse {
+            /* empty class meaning it rotates CCW */
+        }
+
     </style>
 
     <script type="text/javascript">
         function rotate(id, deg) {
-            $('#' + id).animate({ degrees: deg }, {
+            $(id).animate({ degrees: deg }, {
                 step: function(now, fx) {
                     $(this).css('-webkit-transform','rotate('+now+'deg)');
                     $(this).css('-moz-transform','rotate('+now+'deg)');
@@ -86,11 +90,16 @@
             }, 'linear');
         }
 
+        function rotateGroup(groupClass, deg) {
+            rotate(groupClass + ":not(.reverse)", deg);
+            rotate(groupClass + ".reverse", -deg);
+        }
+
         $( document ).ready(function() {
-//            rotate('tile01', 90);
-//            setTimeout(function(){
-//                rotate('tile01', 180);
-//            }, 1000);
+            rotateGroup('.groupA', 90);
+            setTimeout(function(){
+                rotateGroup('.groupA', 180);
+            }, 1000);
 
         });
     </script>
@@ -115,15 +124,15 @@
 
 <img id="tile20" class="tile row2 col0" src="zen_tile.png">
 <img id="tile21" class="tile row2 col1 rot90" src="zen_tile.png">
-<img id="tile22" class="tile row2 col2" src="zen_tile.png">
-<img id="tile23" class="tile row2 col3 rot90" src="zen_tile.png">
+<img id="tile22" class="tile row2 col2 groupA" src="zen_tile.png">
+<img id="tile23" class="tile row2 col3 groupA rot90 reverse" src="zen_tile.png">
 <img id="tile24" class="tile row2 col4" src="zen_tile.png">
 <img id="tile25" class="tile row2 col5 rot90" src="zen_tile.png">
 
 <img id="tile30" class="tile row3 col0 rot270" src="zen_tile.png">
 <img id="tile31" class="tile row3 col1 rot180" src="zen_tile.png">
-<img id="tile32" class="tile row3 col2 rot270" src="zen_tile.png">
-<img id="tile33" class="tile row3 col3 rot180" src="zen_tile.png">
+<img id="tile32" class="tile row3 col2 groupA rot270 reverse" src="zen_tile.png">
+<img id="tile33" class="tile row3 col3 groupA rot180" src="zen_tile.png">
 <img id="tile34" class="tile row3 col4 rot270" src="zen_tile.png">
 <img id="tile35" class="tile row3 col5 rot180" src="zen_tile.png">
 
