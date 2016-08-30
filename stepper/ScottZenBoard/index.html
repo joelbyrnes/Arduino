@@ -3,7 +3,8 @@
 <head>
     <title>Zen Board JS</title>
 
-    <script type="text/javascript" src="http://code.jquery.com/jquery-1.5.2.js"></script>
+    <script type="text/javascript" src="jquery-1.11.1.min.js"></script>
+    <!--<script type="text/javascript" src="http://code.jquery.com/jquery-1.5.2.js"></script>-->
     <!--<script type="text/javascript" src="https://code.jquery.com/jquery-1.12.4.min.js"></script>-->
     <!--<script type="text/javascript" src="https://code.jquery.com/jquery-2.2.4.min.js"></script>-->
     <!--<script type="text/javascript" src="https://code.jquery.com/jquery-3.1.0.min.js"></script>-->
@@ -11,6 +12,12 @@
     <!--<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.9/jquery-ui.js"></script>-->
 
     <style type="text/css">
+        .board {
+            position:absolute;
+            top: 50px;
+            left:50px;
+        }
+
         .tile {
             width:100px;
             height:100px;
@@ -35,41 +42,41 @@
         }
 
         .row0 {
-            top:100px;
+            top:0px;
         }
         .row1 {
-            top:200px;
+            top:100px;
         }
         .row2 {
-            top:300px;
+            top:200px;
         }
         .row3 {
-            top:400px;
+            top:300px;
         }
         .row4 {
-            top:500px;
+            top:400px;
         }
         .row5 {
-            top:600px;
+            top:500px;
         }
 
         .col0 {
-            left:100px;
+            left:px;
         }
         .col1 {
-            left:200px;
+            left:100px;
         }
         .col2 {
-            left:300px;
+            left:200px;
         }
         .col3 {
-            left:400px;
+            left:300px;
         }
         .col4 {
-            left:500px;
+            left:400px;
         }
         .col5 {
-            left:600px;
+            left:500px;
         }
 
         .reverse {
@@ -79,15 +86,36 @@
     </style>
 
     <script type="text/javascript">
+        function setRotation(obj, deg) {
+            obj.css('-webkit-transform','rotate(' + deg + 'deg)');
+            obj.css('-moz-transform','rotate(' + deg + 'deg)');
+            obj.css('transform','rotate(' + deg + 'deg)');
+        }
+
         function rotate(id, deg) {
-            $(id).animate({ degrees: deg }, {
-                step: function(now, fx) {
-                    $(this).css('-webkit-transform','rotate('+now+'deg)');
-                    $(this).css('-moz-transform','rotate('+now+'deg)');
-                    $(this).css('transform','rotate('+now+'deg)');
-                },
-                duration:'slow'
-            }, 'linear');
+            $(id).each(function () {
+                var current = getRotationDegrees($(this))
+                current = (current < 0) ? current + 360 : current;
+
+                // avoid spinning from 360 back to 90 when we want 0 to 90
+                if (deg < 0 && (current == 360 || current == 0)) {
+                    current = 0;
+                    setRotation($(this), 0);
+                }
+
+                var target = current + deg;
+                console.log($(this).attr('id') + ": " + current + " -> " + target);
+                $(this).animate({ degrees: target}, {
+                    step: function(now, fx) {
+                        console.log($(this).attr('id') + ": " + now);
+                        //setRotation($(this), deg);
+                        $(this).css('-webkit-transform','rotate('+now+'deg)');
+                        $(this).css('-moz-transform','rotate('+now+'deg)');
+                        $(this).css('transform','rotate('+now+'deg)');
+                    },
+                    duration:'slow'
+                }, 'linear');
+            });
         }
 
         function rotateGroup(groupClass, deg) {
@@ -115,13 +143,42 @@
                 var b = values[1];
                 var angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
             } else { var angle = 0; }
-            return (angle < 0) ? angle + 360 : angle;
+            //return (angle < 0) ? angle + 360 : angle;
+            return angle;
         }
 
         $( document ).ready(function() {
+            var id = '#tile00';
+
             setTimeout(function(){
-                rotateGroup('.groupA', 90);
+                setRotation($(id), 90);
+                var current = getRotationDegrees($(id));
+                console.log("set to " + current);
             }, 500);
+            setTimeout(function(){
+                rotate(id, 360);
+            }, 2500);
+
+            /*
+            setTimeout(function(){
+                rotate(id, 90);
+            }, 500);
+            setTimeout(function(){
+                rotate(id, 90);
+            }, 2500);
+            setTimeout(function(){
+                rotate(id, 90);
+            }, 4500);
+            setTimeout(function(){
+                rotate(id, 90);
+            }, 6500);
+            setTimeout(function(){
+                rotate(id, 90);
+            }, 8500);
+            setTimeout(function(){
+                rotate(id, 90);
+            }, 10500);
+            */
 
 //            rotateGroupRepeat('.groupA', 90);
 //            rotateGroupRepeat('.groupE', 90);
@@ -158,6 +215,7 @@
 <body>
 
 
+<div class="board">
 <img id="tile00" class="tile row0 col0 groupC" src="zen_tile.png">
 <img id="tile01" class="tile row0 col1 groupD rot90 reverse" src="zen_tile.png">
 <img id="tile02" class="tile row0 col2 groupE" src="zen_tile.png">
@@ -199,7 +257,7 @@
 <img id="tile53" class="tile row5 col3 groupE rot180" src="zen_tile.png">
 <img id="tile54" class="tile row5 col4 groupD rot270 reverse" src="zen_tile.png">
 <img id="tile55" class="tile row5 col5 groupC rot180" src="zen_tile.png">
-
+</div>
 
 </body>
 </html>
