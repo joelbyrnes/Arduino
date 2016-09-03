@@ -163,7 +163,9 @@ void schedule(struct StepperCluster &cluster) {
   cluster.seqPos++;
   cluster.stepper->enableOutputs();
   cluster.stepper->setMaxSpeed(MAX_SPEED);
-  cluster.stepper->move(stepsPer90Degrees);
+  // reverse direction after each cycle through, to avoid slight rotation drift over time 
+  int steps = (cluster.seqPos / 7) % 2 ? stepsPer90Degrees * -1 : stepsPer90Degrees;
+  cluster.stepper->move(steps);
   cluster.seeking = 1;
 }
 
