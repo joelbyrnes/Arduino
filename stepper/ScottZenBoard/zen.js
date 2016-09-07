@@ -4,42 +4,27 @@ function setRotation(obj, deg) {
     obj.css('transform','rotate(' + deg + 'deg)');
 }
 
-function rotate(id, deg) {
+function rotateRad(id, rad) {
     $(id).each(function () {
-        var current = getRotationDegrees($(this))
-        current = (current < 0) ? current + 360 : current;
+        console.log($(this).attr('id') + ": " + getRotationRadians($(this)) + " -> " + rad);
 
-        // avoid spinning from 360 back to 90 when we want 0 to 90
-        if (deg < 0 && (current == 360 || current == 0)) {
-            //current = 0;
-            //setRotation($(this), 0);
-        }
-
-        var target = current + deg;
-        console.log($(this).attr('id') + ": " + current + " -> " + target);
-        $(this).animate({ degrees: target}, {
-            step: function(now, fx) {
-                console.log($(this).attr('id') + ": " + now);
-                //setRotation($(this), deg);
-                $(this).css('-webkit-transform','rotate('+now+'deg)');
-                $(this).css('-moz-transform','rotate('+now+'deg)');
-                $(this).css('transform','rotate('+now+'deg)');
-            },
-            duration:'slow'
-        }, 'linear');
+        snabbt($(this), {
+          rotation: [0, 0, rad],
+          easing: 'ease'
+        });
     });
 }
 
-function rotateGroup(groupClass, deg) {
-    rotate(groupClass + ":not(.reverse)", deg);
-    rotate(groupClass + ".reverse", -deg);
+function rotateGroup(groupClass, rads) {
+    rotateRad(groupClass + ":not(.reverse)", rads);
+    rotateRad(groupClass + ".reverse", -rads);
 }
 
-function rotateGroupRepeat(groupClass, deg) {
-    rotateGroup(groupClass, deg);
+function rotateGroupRepeat(groupClass, rads) {
+    rotateGroup(groupClass, rads);
     setTimeout(function() {
-        rotateGroupRepeat(groupClass, deg + 90);
-    }, 500);
+        rotateGroupRepeat(groupClass, rads + Math.PI * -0.5);
+    }, 1000);
 }
 
 // some genius at http://stackoverflow.com/questions/8270612/get-element-moz-transformrotate-value-in-jquery
@@ -59,6 +44,22 @@ function getRotationDegrees(obj) {
     return angle;
 }
 
+function getRotationRadians(obj) {
+    var matrix = obj.css("-webkit-transform") ||
+            obj.css("-moz-transform")    ||
+            obj.css("-ms-transform")     ||
+            obj.css("-o-transform")      ||
+            obj.css("transform");
+    if(matrix !== 'none') {
+        var values = matrix.split('(')[1].split(')')[0].split(',');
+        var a = values[0];
+        var b = values[1];
+        var rads = Math.atan2(b, a);
+    } else { var rads = 0; }
+    //return (rads < 0) ? rads + (2*Math.PI) : rads;
+    return rads;
+}
+
 $( document ).ready(function() {
     // init to specified rotations
 
@@ -72,27 +73,50 @@ $( document ).ready(function() {
         setRotation($(this), 270);
     });
 
+    setTimeout(function(){
+        rotateGroup('.groupA', Math.PI * -0.5);
+    }, 500);
+
+    rotateGroupRepeat('.groupB', Math.PI * -0.5);
+
+
+/*
     var id = '#tile00';
 
+    // why the hell do radians CCW?
+
+    var rads = 0;
+    var turn = Math.PI * -0.5;
+
     setTimeout(function(){
-        rotate(id, 90);
+        rotateRad(id, rads += turn);
     }, 500);
     setTimeout(function(){
-        rotate(id, 90);
+        rotateRad(id, rads += turn);
     }, 2500);
     setTimeout(function(){
-        rotate(id, 90);
+        rotateRad(id, rads += -turn);
     }, 4500);
     setTimeout(function(){
-        rotate(id, 90);
+        rotateRad(id, rads += turn);
     }, 6500);
     setTimeout(function(){
-        rotate(id, 90);
+        rotateRad(id, rads += turn);
     }, 8500);
     setTimeout(function(){
-        rotate(id, 90);
+        rotateRad(id, rads += turn);
     }, 10500);
+    setTimeout(function(){
+        rotateRad(id, rads += turn);
+    }, 12500);
+    setTimeout(function(){
+        rotateRad(id, rads += turn);
+    }, 14500);
+    setTimeout(function(){
+        rotateRad(id, rads += -turn);
+    }, 16500);
 
+*/
 //    rotateGroupRepeat('.groupA', 90);
 //    rotateGroupRepeat('.groupE', 90);
 //    rotateGroupRepeat('.groupF', 90);
