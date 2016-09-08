@@ -64,13 +64,13 @@ $( document ).ready(function() {
     // init to specified rotations
 
     $('.rot90').each(function () {
-        setRotation($(this), 90);
+//        setRotation($(this), 90);
     });
     $('.rot180').each(function () {
-        setRotation($(this), 180);
+//        setRotation($(this), 180);
     });
     $('.rot270').each(function () {
-        setRotation($(this), 270);
+//        setRotation($(this), 270);
     });
 
     setTimeout(function(){
