@@ -100,6 +100,9 @@ StepperCluster *clusters[NUM_STEPPERS] = {&clusterA, &clusterB, &clusterC, &clus
 // the time between sequence steps, in seconds.
 int timeFactor = 6;
 
+// reverse direction after this many cycles
+#define CYCLE_REVERSE_COUNT 25
+
 unsigned int ms;
 
 void setup() {
@@ -163,7 +166,9 @@ void schedule(struct StepperCluster &cluster) {
   cluster.seqPos++;
   cluster.stepper->enableOutputs();
   cluster.stepper->setMaxSpeed(MAX_SPEED);
-  cluster.stepper->move(stepsPer90Degrees);
+  // reverse direction after each cycle through, to avoid slight rotation drift over time 
+  int steps = (cluster.seqPos / 7 * CYCLE_REVERSE_COUNT) % 2? stepsPer90Degrees * -1: stepsPer90Degrees;
+  cluster.stepper->move(steps);
   cluster.seeking = 1;
 }
 
