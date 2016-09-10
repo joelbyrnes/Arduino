@@ -23,13 +23,15 @@ var CYCLE_REVERSE_COUNT = 3
 
 function rotateRad(id, byRads, duration) {
     $(id).each(function () {
-        var target = $(this).data('rotation') + byRads || byRads;
-        console.log($(this).attr('id') + ": " + $(this).data('rotation') + " -> " + target);
+        var current = $(this).data('rotation') || 0;
+        var target = current + byRads;
+        console.log($(this).attr('id') + ": " + current + " -> " + target);
+//        console.log("byRads: " + byRads + ", movement is by " + Math.abs(current - target));
 
         snabbt($(this), {
-          rotation: [0, 0, target],
-          easing: 'ease',
-          duration: duration || 500
+            rotation: [0, 0, target],
+            easing: 'ease',
+            duration: duration || 500
         });
 
         $(this).data('rotation', target);
@@ -37,23 +39,21 @@ function rotateRad(id, byRads, duration) {
 }
 
 function rotateGroup(cluster, rads) {
+    // clockwise turn in radians is negative
     var rads = rads || Math.PI * -0.5;
 //    var direction = Math.floor(cluster.seqPos / 7 * CYCLE_REVERSE_COUNT) % 2 > 0? -1: 1;
     var direction = 1;
 
     console.log(cluster.groupClass + " rotating in direction " + direction);
 
-    rotateRad(cluster.groupClass + ":not(.reverse)", rads);
-    rotateRad(cluster.groupClass + ".reverse", -rads);
-
-    // determine direction and schedule next rotation
-    schedule(cluster);
+    rotateRad(cluster.groupClass + ":not(.reverse)", rads * direction);
+    rotateRad(cluster.groupClass + ".reverse", -rads * direction);
 }
 
 function schedule(cluster) {
     var interval = cluster.sequence[cluster.seqPos % 7] * timeFactor * 1000;
     setTimeout(function(){
-        rotateGroup(cluster);
+        iterate(cluster);
     }, interval);
 
     console.log(cluster.groupClass + " seqPos " + cluster.seqPos + " (" + cluster.seqPos % 7 + ")"
@@ -61,17 +61,22 @@ function schedule(cluster) {
     cluster.seqPos++;
 }
 
+function iterate(cluster) {
+    rotateGroup(cluster);
+    schedule(cluster);
+}
+
 $( document ).ready(function() {
     // init to specified rotations
 
     $('.rot90').each(function () {
-        rotateRad($(this), Math.PI * -0.5, 100)
+        rotateRad($(this), Math.PI * 1.5, 100)
     });
     $('.rot180').each(function () {
-        rotateRad($(this), Math.PI * -1, 100)
+        rotateRad($(this), Math.PI * 1, 100)
     });
     $('.rot270').each(function () {
-        rotateRad($(this), Math.PI * -1.5, 100)
+        rotateRad($(this), Math.PI * 0.5, 100)
     });
 
     console.log("setting initial schedules");
@@ -80,73 +85,5 @@ $( document ).ready(function() {
     $.each(clusters, function (index, cluster) {
         schedule(cluster);
     });
-
-//    rotateGroupRepeat('.groupB', Math.PI * -0.5);
-
-
-/*
-    var id = '#tile00';
-
-    // why the hell do radians CCW?
-
-    var rads = 0;
-    var turn = Math.PI * -0.5;
-
-    setTimeout(function(){
-        rotateRad(id, rads += turn);
-    }, 500);
-    setTimeout(function(){
-        rotateRad(id, rads += turn);
-    }, 2500);
-    setTimeout(function(){
-        rotateRad(id, rads += -turn);
-    }, 4500);
-    setTimeout(function(){
-        rotateRad(id, rads += turn);
-    }, 6500);
-    setTimeout(function(){
-        rotateRad(id, rads += turn);
-    }, 8500);
-    setTimeout(function(){
-        rotateRad(id, rads += turn);
-    }, 10500);
-    setTimeout(function(){
-        rotateRad(id, rads += turn);
-    }, 12500);
-    setTimeout(function(){
-        rotateRad(id, rads += turn);
-    }, 14500);
-    setTimeout(function(){
-        rotateRad(id, rads += -turn);
-    }, 16500);
-
-*/
-//    rotateGroupRepeat('.groupA', 90);
-//    rotateGroupRepeat('.groupE', 90);
-//    rotateGroupRepeat('.groupF', 90);
-//    rotateGroupRepeat('.groupB', 90);
-//    rotateGroupRepeat('.groupC', 90);
-//    rotateGroupRepeat('.groupD', 90);
-
-    /*
-    setTimeout(function(){
-        rotateGroup('.groupA', 180);
-    }, 500);
-    setTimeout(function(){
-        rotateGroup('.groupB', 180);
-    }, 1000);
-    setTimeout(function(){
-        rotateGroup('.groupC', 180);
-    }, 1500);
-    setTimeout(function(){
-        rotateGroup('.groupD', 180);
-    }, 2000);
-    setTimeout(function(){
-        rotateGroup('.groupE', 180);
-    }, 2500);
-    setTimeout(function(){
-        rotateGroup('.groupF', 180);
-    }, 3000);
-    */
 
 });
