@@ -3,7 +3,7 @@ var StepperCluster = function(groupClass, sequence) {
   this.groupClass = groupClass;
   this.sequence = sequence;
   this.seqPos = 0;
-  console.log('StepperCluster instantiated for ' + this.groupClass + " with " + this.sequence);
+//  console.log('StepperCluster instantiated for ' + this.groupClass + " with " + this.sequence);
 };
 
 var clusterA = new StepperCluster('.groupA', [3, 4, 5, 6, 7, 8, 3]);
@@ -21,81 +21,44 @@ var timeFactor = 1;
 // reverse direction after this many cycles
 var CYCLE_REVERSE_COUNT = 3
 
-
-function setRotation(obj, deg) {
-    obj.css('-webkit-transform','rotate(' + deg + 'deg)');
-    obj.css('-moz-transform','rotate(' + deg + 'deg)');
-    obj.css('transform','rotate(' + deg + 'deg)');
-}
-
-function rotateRad(id, rad, duration) {
+function rotateRad(id, byRads, duration) {
     $(id).each(function () {
-        console.log($(this).attr('id') + ": " + $(this).data('rotation') + " -> " + rad);
+        var target = $(this).data('rotation') + byRads || byRads;
+        console.log($(this).attr('id') + ": " + $(this).data('rotation') + " -> " + target);
 
         snabbt($(this), {
-          rotation: [0, 0, rad],
+          rotation: [0, 0, target],
           easing: 'ease',
           duration: duration || 500
         });
 
-        $(this).data('rotation', rad);
+        $(this).data('rotation', target);
     });
 }
 
 function rotateGroup(cluster, rads) {
-    console.log(cluster.groupClass + " moving to " + rads + " radians");
+    var rads = rads || Math.PI * -0.5;
+//    var direction = Math.floor(cluster.seqPos / 7 * CYCLE_REVERSE_COUNT) % 2 > 0? -1: 1;
+    var direction = 1;
+
+    console.log(cluster.groupClass + " rotating in direction " + direction);
 
     rotateRad(cluster.groupClass + ":not(.reverse)", rads);
     rotateRad(cluster.groupClass + ".reverse", -rads);
 
-    var interval = cluster.sequence[cluster.seqPos++ % 7] * timeFactor * 1000;
-//    var direction = Math.floor(cluster.seqPos / 7 * CYCLE_REVERSE_COUNT) % 2 > 0? -1: 1;
-    var direction = 1;
-    console.log(cluster.groupClass + " seqPos " + cluster.seqPos + " (" + cluster.seqPos % 7 + ")" + " scheduled in " + interval + " ms in direction " + direction);
+    // determine direction and schedule next rotation
+    schedule(cluster);
+}
 
+function schedule(cluster) {
+    var interval = cluster.sequence[cluster.seqPos % 7] * timeFactor * 1000;
     setTimeout(function(){
-        rotateGroup(cluster, rads + (Math.PI * -0.5 * direction));
+        rotateGroup(cluster);
     }, interval);
-}
 
-function rotateGroupRepeat(groupClass, rads) {
-    rotateGroup(groupClass, rads);
-    setTimeout(function() {
-        rotateGroupRepeat(groupClass, rads + Math.PI * -0.5);
-    }, 1000);
-}
-
-// some genius at http://stackoverflow.com/questions/8270612/get-element-moz-transformrotate-value-in-jquery
-function getRotationDegrees(obj) {
-    var matrix = obj.css("-webkit-transform") ||
-            obj.css("-moz-transform")    ||
-            obj.css("-ms-transform")     ||
-            obj.css("-o-transform")      ||
-            obj.css("transform");
-    if(matrix !== 'none') {
-        var values = matrix.split('(')[1].split(')')[0].split(',');
-        var a = values[0];
-        var b = values[1];
-        var angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
-    } else { var angle = 0; }
-    //return (angle < 0) ? angle + 360 : angle;
-    return angle;
-}
-
-function getRotationRadians(obj) {
-    var matrix = obj.css("-webkit-transform") ||
-            obj.css("-moz-transform")    ||
-            obj.css("-ms-transform")     ||
-            obj.css("-o-transform")      ||
-            obj.css("transform");
-    if(matrix !== 'none') {
-        var values = matrix.split('(')[1].split(')')[0].split(',');
-        var a = values[0];
-        var b = values[1];
-        var rads = Math.atan2(b, a);
-    } else { var rads = 0; }
-    //return (rads < 0) ? rads + (2*Math.PI) : rads;
-    return rads;
+    console.log(cluster.groupClass + " seqPos " + cluster.seqPos + " (" + cluster.seqPos % 7 + ")"
+            + " scheduled in " + interval + " ms");
+    cluster.seqPos++;
 }
 
 $( document ).ready(function() {
@@ -111,14 +74,11 @@ $( document ).ready(function() {
         rotateRad($(this), Math.PI * -1.5, 100)
     });
 
+    console.log("setting initial schedules");
+
     // schedule first set of rotations
     $.each(clusters, function (index, cluster) {
-        var interval = cluster.sequence[cluster.seqPos++ % 7] * timeFactor * 1000;
-        console.log("scheduling " + cluster.groupClass + " in " + interval + " ms");
-
-        setTimeout(function(){
-            rotateGroup(cluster, Math.PI * -0.5);
-        }, interval);
+        schedule(cluster);
     });
 
 //    rotateGroupRepeat('.groupB', Math.PI * -0.5);
