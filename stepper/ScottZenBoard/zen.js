@@ -16,10 +16,10 @@ var clusterF = new StepperCluster('.groupF', [8, 3, 4, 5, 6, 7, 8]);
 var clusters = [clusterA, clusterB, clusterC, clusterD, clusterE, clusterF];
 
 // the time between sequence steps, in seconds.
-var timeFactor = 2;
+var timeFactor = 1;
 
 // reverse direction after this many cycles
-var CYCLE_REVERSE_COUNT = 25
+var CYCLE_REVERSE_COUNT = 3
 
 
 function setRotation(obj, deg) {
@@ -28,33 +28,33 @@ function setRotation(obj, deg) {
     obj.css('transform','rotate(' + deg + 'deg)');
 }
 
-function rotateRad(id, rad) {
+function rotateRad(id, rad, duration) {
     $(id).each(function () {
-//        console.log($(this).attr('id') + ": " + getRotationRadians($(this)) + " -> " + rad);
+        console.log($(this).attr('id') + ": " + $(this).data('rotation') + " -> " + rad);
 
         snabbt($(this), {
           rotation: [0, 0, rad],
-          easing: 'ease'
+          easing: 'ease',
+          duration: duration || 500
         });
+
+        $(this).data('rotation', rad);
     });
 }
 
 function rotateGroup(cluster, rads) {
-    console.log("Cluster " + cluster.groupClass + " moving to " + rads + " radians");
-
-//    int steps = (cluster.seqPos / 7 * CYCLE_REVERSE_COUNT) % 2? direction * -1: stepsPer90Degrees;
-//    cluster.stepper->move(steps);
+    console.log(cluster.groupClass + " moving to " + rads + " radians");
 
     rotateRad(cluster.groupClass + ":not(.reverse)", rads);
     rotateRad(cluster.groupClass + ".reverse", -rads);
-//    console.log(cluster.groupClass);
-//    console.log("next " + cluster.sequence[cluster.seqPos]);
 
     var interval = cluster.sequence[cluster.seqPos++ % 7] * timeFactor * 1000;
-    console.log("scheduling " + cluster.groupClass + " in " + interval + " ms");
+//    var direction = Math.floor(cluster.seqPos / 7 * CYCLE_REVERSE_COUNT) % 2 > 0? -1: 1;
+    var direction = 1;
+    console.log(cluster.groupClass + " seqPos " + cluster.seqPos + " (" + cluster.seqPos % 7 + ")" + " scheduled in " + interval + " ms in direction " + direction);
 
     setTimeout(function(){
-        rotateGroup(cluster, rads + (Math.PI * -0.5));
+        rotateGroup(cluster, rads + (Math.PI * -0.5 * direction));
     }, interval);
 }
 
@@ -101,18 +101,17 @@ function getRotationRadians(obj) {
 $( document ).ready(function() {
     // init to specified rotations
 
-    // TODO track original rotation per-tile
     $('.rot90').each(function () {
-//        setRotation($(this), 90);
+        rotateRad($(this), Math.PI * -0.5, 100)
     });
     $('.rot180').each(function () {
-//        setRotation($(this), 180);
+        rotateRad($(this), Math.PI * -1, 100)
     });
     $('.rot270').each(function () {
-//        setRotation($(this), 270);
+        rotateRad($(this), Math.PI * -1.5, 100)
     });
 
-    // start all rotations after 1s
+    // schedule first set of rotations
     $.each(clusters, function (index, cluster) {
         var interval = cluster.sequence[cluster.seqPos++ % 7] * timeFactor * 1000;
         console.log("scheduling " + cluster.groupClass + " in " + interval + " ms");
