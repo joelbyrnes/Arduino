@@ -14,10 +14,19 @@
     <script type="text/javascript" src="snabbt.min.js"></script>
 
     <style type="text/css">
-        .board {
+        body {
+            background-color: black;
+
+        }
+        .zenframe {
+            background-color: black;
+        }
+
+        .zenboard {
             position:absolute;
             top: 50px;
             left:50px;
+            background-color: black;
         }
 
         .tile {
@@ -84,7 +93,9 @@
 <body>
 
 
-<div class="board">
+<div class="zenframe">
+
+<div id="zenboard" class="zenboard">
 <img id="tile00" class="tile row0 col0 groupC" src="zen_tile.png">
 <img id="tile01" class="tile row0 col1 groupD rot90 reverse" src="zen_tile.png">
 <img id="tile02" class="tile row0 col2 groupE" src="zen_tile.png">
@@ -126,6 +137,8 @@
 <img id="tile53" class="tile row5 col3 groupE rot180" src="zen_tile.png">
 <img id="tile54" class="tile row5 col4 groupD rot270 reverse" src="zen_tile.png">
 <img id="tile55" class="tile row5 col5 groupC rot180" src="zen_tile.png">
+</div>
+
 </div>
 
 </body>
