@@ -1,30 +1,23 @@
 
-var StepperCluster = function(groupClass, sequence, zenboard) {
-  this.groupClass = groupClass;
-  this.sequence = sequence;
-  this.seqPos = 0;
-  this.zenboard = zenboard;
-//  console.log('StepperCluster instantiated for ' + this.groupClass + " with " + this.sequence);
-};
-
 var ZenBoard = function(cssId) {
     this.cssId = cssId;
     this.clusters = [];
     this.timeFactor = 1;
-    this.cycleReverseCount = 3
+    this.cycleReverseCount = 3;
+    this.rotateDuration = 500;
 }
 
 ZenBoard.prototype.init = function() {
     // TODO should only select within enclosing elem
 
     $('.rot90').each(function () {
-        rotateRad($(this), Math.PI * 1.5, 100);
+        rotateTiles($(this), Math.PI * 1.5, 100);
     });
     $('.rot180').each(function () {
-        rotateRad($(this), Math.PI * 1, 100);
+        rotateTiles($(this), Math.PI * 1, 100);
     });
     $('.rot270').each(function () {
-        rotateRad($(this), Math.PI * 0.5, 100);
+        rotateTiles($(this), Math.PI * 0.5, 100);
     });
 }
 
@@ -40,11 +33,11 @@ ZenBoard.prototype.addSequence = function(groupClass, sequence, zenboard) {
     this.clusters.push(cluster);
 }
 
-function rotateRad(id, byRads, duration) {
+function rotateTiles(id, byRads, duration) {
     $(id).each(function () {
         var current = $(this).data('rotation') || 0;
         var target = current + byRads;
-        console.log($(this).attr('id') + ": " + current + " -> " + target);
+//        console.log($(this).attr('id') + ": " + current + " -> " + target);
 //        console.log("byRads: " + byRads + ", movement is by " + Math.abs(current - target));
 
         snabbt($(this), {
@@ -57,16 +50,23 @@ function rotateRad(id, byRads, duration) {
     });
 }
 
+var StepperCluster = function(groupClass, sequence, zenboard) {
+  this.groupClass = groupClass;
+  this.sequence = sequence;
+  this.zenboard = zenboard;
+  this.seqPos = 0;
+};
+
 StepperCluster.prototype.rotateGroup = function(rads) {
     // clockwise turn in radians is negative
     var rads = rads || Math.PI * -0.5;
-//    var direction = Math.floor(this.seqPos / 7 * CYCLE_REVERSE_COUNT) % 2 > 0? -1: 1;
-    var direction = 1;
+    var direction = Math.floor(this.seqPos / (7 * this.zenboard.cycleReverseCount)) % 2 > 0? -1: 1;
+//    var direction = 1;
 
     console.log(this.groupClass + " rotating in direction " + direction);
 
-    rotateRad(this.groupClass + ":not(.reverse)", rads * direction);
-    rotateRad(this.groupClass + ".reverse", -rads * direction);
+    rotateTiles(this.groupClass + ":not(.reverse)", rads * direction, this.zenboard.rotateDuration);
+    rotateTiles(this.groupClass + ".reverse", -rads * direction, this.zenboard.rotateDuration);
 }
 
 StepperCluster.prototype.iterate = function() {
@@ -75,7 +75,7 @@ StepperCluster.prototype.iterate = function() {
 }
 
 StepperCluster.prototype.schedule = function() {
-    console.log(this.groupClass + " timefactor " + this.zenboard.timeFactor);
+//    console.log(this.groupClass + " timefactor " + this.zenboard.timeFactor);
     var interval = this.sequence[this.seqPos % 7] * this.zenboard.timeFactor * 1000;
     var foo = this;
     setTimeout(function(){
@@ -86,29 +86,3 @@ StepperCluster.prototype.schedule = function() {
             + " scheduled in " + interval + " ms");
     this.seqPos++;
 }
-
-// TODO move below to HTML page
-var board;
-
-$( document ).ready(function() {
-    board = new ZenBoard('#zenboard');
-
-    board.addSequence('.groupA', [3, 4, 5, 6, 7, 8, 3]);
-    board.addSequence('.groupB', [4, 5, 6, 7, 8, 3, 4]);
-    board.addSequence('.groupC', [5, 6, 7, 8, 3, 4, 5]);
-    board.addSequence('.groupD', [6, 7, 8, 3, 4, 5, 6]);
-    board.addSequence('.groupE', [7, 8, 3, 4, 5, 6, 7]);
-    board.addSequence('.groupF', [8, 3, 4, 5, 6, 7, 8]);
-
-    // the time between sequence steps, in seconds.
-    board.timeFactor = 1;
-
-    // reverse direction after this many cycles
-    board.cycleReverseCount = 3
-
-    // init to specified rotations
-    board.init();
-
-    console.log("start: setting initial schedules");
-    board.start();
-});
