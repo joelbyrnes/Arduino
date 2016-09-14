@@ -7,9 +7,9 @@ var StepperCluster = function(groupClass, sequence, zenboard) {
 //  console.log('StepperCluster instantiated for ' + this.groupClass + " with " + this.sequence);
 };
 
-var ZenBoard = function(elem, clusters) {
-    this.elem = elem;
-    this.clusters = clusters;
+var ZenBoard = function(cssId) {
+    this.cssId = cssId;
+    this.clusters = [];
     this.timeFactor = 1;
     this.cycleReverseCount = 3
 }
@@ -26,6 +26,18 @@ ZenBoard.prototype.init = function() {
     $('.rot270').each(function () {
         rotateRad($(this), Math.PI * 0.5, 100);
     });
+}
+
+ZenBoard.prototype.start = function() {
+    // schedule first set of rotations
+    $.each(this.clusters, function (index, cluster) {
+        cluster.schedule();
+    });
+}
+
+ZenBoard.prototype.addSequence = function(groupClass, sequence, zenboard) {
+    var cluster = new StepperCluster(groupClass, sequence, this);
+    this.clusters.push(cluster);
 }
 
 function rotateRad(id, byRads, duration) {
@@ -75,29 +87,18 @@ StepperCluster.prototype.schedule = function() {
     this.seqPos++;
 }
 
-ZenBoard.prototype.start = function() {
-    // schedule first set of rotations
-    var board = this;
-    $.each(this.clusters, function (index, cluster) {
-        cluster.zenboard = board;
-        cluster.schedule();
-    });
-}
-
 // TODO move below to HTML page
 var board;
 
 $( document ).ready(function() {
-    var clusterA = new StepperCluster('.groupA', [3, 4, 5, 6, 7, 8, 3]);
-    var clusterB = new StepperCluster('.groupB', [4, 5, 6, 7, 8, 3, 4]);
-    var clusterC = new StepperCluster('.groupC', [5, 6, 7, 8, 3, 4, 5]);
-    var clusterD = new StepperCluster('.groupD', [6, 7, 8, 3, 4, 5, 6]);
-    var clusterE = new StepperCluster('.groupE', [7, 8, 3, 4, 5, 6, 7]);
-    var clusterF = new StepperCluster('.groupF', [8, 3, 4, 5, 6, 7, 8]);
+    board = new ZenBoard('#zenboard');
 
-    var clusters = [clusterA, clusterB, clusterC, clusterD, clusterE, clusterF];
-
-    board = new ZenBoard($('#zenboard'), clusters);
+    board.addSequence('.groupA', [3, 4, 5, 6, 7, 8, 3]);
+    board.addSequence('.groupB', [4, 5, 6, 7, 8, 3, 4]);
+    board.addSequence('.groupC', [5, 6, 7, 8, 3, 4, 5]);
+    board.addSequence('.groupD', [6, 7, 8, 3, 4, 5, 6]);
+    board.addSequence('.groupE', [7, 8, 3, 4, 5, 6, 7]);
+    board.addSequence('.groupF', [8, 3, 4, 5, 6, 7, 8]);
 
     // the time between sequence steps, in seconds.
     board.timeFactor = 1;
@@ -108,6 +109,6 @@ $( document ).ready(function() {
     // init to specified rotations
     board.init();
 
-    console.log("setting initial schedules");
+    console.log("start: setting initial schedules");
     board.start();
 });
