@@ -5,6 +5,7 @@ var ZenBoard = function(cssId) {
     this.timeFactor = 1;
     this.cycleReverseCount = 3;
     this.rotateDuration = 500;
+    this.run = false;
 }
 
 ZenBoard.prototype.init = function() {
@@ -22,10 +23,15 @@ ZenBoard.prototype.init = function() {
 }
 
 ZenBoard.prototype.start = function() {
+    this.run = true;
     // schedule first set of rotations
     $.each(this.clusters, function (index, cluster) {
         cluster.schedule();
     });
+}
+
+ZenBoard.prototype.pause = function() {
+    this.run = false;
 }
 
 ZenBoard.prototype.addSequence = function(groupClass, sequence, zenboard) {
@@ -71,7 +77,7 @@ StepperCluster.prototype.rotateGroup = function(rads) {
 
 StepperCluster.prototype.iterate = function() {
     this.rotateGroup();
-    this.schedule();
+    if (this.zenboard.run) this.schedule();
 }
 
 StepperCluster.prototype.schedule = function() {
