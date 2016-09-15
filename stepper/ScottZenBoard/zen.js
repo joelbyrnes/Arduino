@@ -9,15 +9,13 @@ var ZenBoard = function(cssId) {
 }
 
 ZenBoard.prototype.init = function() {
-    // TODO should only select within enclosing elem
-
-    $('.rot90').each(function () {
+    $(this.cssId + ' .tile.rot90').each(function () {
         rotateTiles($(this), Math.PI * 1.5, 100);
     });
-    $('.rot180').each(function () {
+    $(this.cssId + ' .tile.rot180').each(function () {
         rotateTiles($(this), Math.PI * 1, 100);
     });
-    $('.rot270').each(function () {
+    $(this.cssId + ' .tile.rot270').each(function () {
         rotateTiles($(this), Math.PI * 0.5, 100);
     });
 }
