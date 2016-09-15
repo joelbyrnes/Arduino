@@ -32,11 +32,17 @@ ZenBoard.prototype.start = function() {
 
 ZenBoard.prototype.pause = function() {
     this.run = false;
+    console.log("paused, will not schedule further movements until start called")
 }
 
 ZenBoard.prototype.addSequence = function(groupClass, sequence, zenboard) {
     var cluster = new StepperCluster(groupClass, sequence, this);
     this.clusters.push(cluster);
+}
+
+ZenBoard.prototype.tileImageSrc = function(imgUrl) {
+    $(this.cssId + " img.tile").attr('src', imgUrl);
+    console.log("changed tile image to " + imgUrl)
 }
 
 function rotateTiles(id, byRads, duration) {
