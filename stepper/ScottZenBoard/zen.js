@@ -5,7 +5,6 @@ var ZenBoard = function(cssId) {
     this.timeFactor = 1;
     this.cycleReverseCount = 3;
     this.rotateDuration = 500;
-    this.run = false;
 }
 
 ZenBoard.prototype.init = function() {
@@ -21,12 +20,7 @@ ZenBoard.prototype.init = function() {
 }
 
 ZenBoard.prototype.start = function() {
-    if (this.run) {
-        console.log("start called but already running, ignoring");
-        return;
-    }
     console.log("start, scheduling next movements")
-    this.run = true;
     // schedule first set of rotations
     $.each(this.clusters, function (index, cluster) {
         cluster.schedule();
@@ -34,7 +28,6 @@ ZenBoard.prototype.start = function() {
 }
 
 ZenBoard.prototype.pause = function() {
-    this.run = false;
     $.each(this.clusters, function (index, cluster) {
         cluster.timer.pause();
     });
@@ -42,9 +35,7 @@ ZenBoard.prototype.pause = function() {
 }
 
 ZenBoard.prototype.resume = function() {
-    this.run = true;
     console.log("resuming")
-
     $.each(this.clusters, function (index, cluster) {
         cluster.timer.resume();
     });
@@ -84,21 +75,25 @@ function rotateTiles(id, byRads, duration) {
 
 // http://stackoverflow.com/questions/3969475/javascript-pause-settimeout
 function Timer(callback, delay) {
-    var timerId, start, remaining = delay;
+    var timerId = null;
+    var start, remaining = delay;
 
-    // TODO check for already paused
     this.pause = function() {
+        // check for already paused
+        if (timerId == null) return;
         window.clearTimeout(timerId);
         remaining -= new Date() - start;
-        console.log("Timer " + timerId + " paused with " + remaining + " remaining")
+//        console.log("Timer " + timerId + " paused with " + remaining + " remaining")
+        timerId = null;
     };
 
-    // TODO check for already running
     this.resume = function() {
+        // check for already running
+        if (timerId != null) return;
         start = new Date();
         window.clearTimeout(timerId);
         timerId = window.setTimeout(callback, remaining);
-        console.log("Timer " + timerId + " started/resumed with " + remaining + " remaining")
+//        console.log("Timer " + timerId + " started/resumed with " + remaining + " remaining")
     };
 
     this.resume();
@@ -125,10 +120,8 @@ StepperCluster.prototype.rotateGroup = function(rads) {
 }
 
 StepperCluster.prototype.iterate = function() {
-    if (this.zenboard.run) {
-        this.rotateGroup();
-        this.schedule();
-    }
+    this.rotateGroup();
+    this.schedule();
 }
 
 StepperCluster.prototype.schedule = function() {
