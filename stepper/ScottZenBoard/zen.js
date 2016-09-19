@@ -21,6 +21,11 @@ ZenBoard.prototype.init = function() {
 }
 
 ZenBoard.prototype.start = function() {
+    if (this.run) {
+        console.log("start called but already running, ignoring");
+        return;
+    }
+    console.log("start, scheduling next movements")
     this.run = true;
     // schedule first set of rotations
     $.each(this.clusters, function (index, cluster) {
@@ -30,7 +35,19 @@ ZenBoard.prototype.start = function() {
 
 ZenBoard.prototype.pause = function() {
     this.run = false;
-    console.log("paused, will not schedule further movements until start called")
+    $.each(this.clusters, function (index, cluster) {
+        cluster.timer.pause();
+    });
+    console.log("paused, will not iterate further movements until start called")
+}
+
+ZenBoard.prototype.resume = function() {
+    this.run = true;
+    console.log("resuming")
+
+    $.each(this.clusters, function (index, cluster) {
+        cluster.timer.resume();
+    });
 }
 
 ZenBoard.prototype.addSequence = function(groupClass, sequence, zenboard) {
@@ -60,11 +77,39 @@ function rotateTiles(id, byRads, duration) {
     });
 }
 
+// TODO convert to prototype mode. use composition?
+//var Timer = function(callback, delay) {
+//
+//}
+
+// http://stackoverflow.com/questions/3969475/javascript-pause-settimeout
+function Timer(callback, delay) {
+    var timerId, start, remaining = delay;
+
+    // TODO check for already paused
+    this.pause = function() {
+        window.clearTimeout(timerId);
+        remaining -= new Date() - start;
+        console.log("Timer " + timerId + " paused with " + remaining + " remaining")
+    };
+
+    // TODO check for already running
+    this.resume = function() {
+        start = new Date();
+        window.clearTimeout(timerId);
+        timerId = window.setTimeout(callback, remaining);
+        console.log("Timer " + timerId + " started/resumed with " + remaining + " remaining")
+    };
+
+    this.resume();
+}
+
 var StepperCluster = function(groupClass, sequence, zenboard) {
   this.groupClass = groupClass;
   this.sequence = sequence;
   this.zenboard = zenboard;
   this.seqPos = 0;
+  this.timer;
 };
 
 StepperCluster.prototype.rotateGroup = function(rads) {
@@ -80,15 +125,17 @@ StepperCluster.prototype.rotateGroup = function(rads) {
 }
 
 StepperCluster.prototype.iterate = function() {
-    this.rotateGroup();
-    if (this.zenboard.run) this.schedule();
+    if (this.zenboard.run) {
+        this.rotateGroup();
+        this.schedule();
+    }
 }
 
 StepperCluster.prototype.schedule = function() {
 //    console.log(this.groupClass + " timefactor " + this.zenboard.timeFactor);
     var interval = this.sequence[this.seqPos % 7] * this.zenboard.timeFactor * 1000;
     var foo = this;
-    setTimeout(function(){
+    this.timer = new Timer(function() {
         foo.iterate();
     }, interval);
 

@@ -119,7 +119,7 @@
             // init to specified rotations
             board.init();
 
-            console.log("start: setting initial schedules");
+            // start scheduler
             board.start();
         });
 
@@ -161,6 +161,20 @@
                     <option value="zen_tile.png">circles & squares</option>
                     <option value="zen_tile2.png">rounded</option>
                 </select>
+            </td>
+        </tr>
+
+        <tr>
+            <th></th>
+            <td>
+                <button onclick="board.pause()">Pause</button>
+            </td>
+        </tr>
+
+        <tr>
+            <th></th>
+            <td>
+                <button onclick="board.resume()">Resume</button>
             </td>
         </tr>
 
