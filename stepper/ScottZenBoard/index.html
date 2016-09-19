@@ -153,6 +153,17 @@
                        onchange="console.log(this.name + ': ' + this.value); board.cycleReverseCount = this.value;"/></td>
         </tr>
 
+        <tr>
+            <th>tiles</th>
+            <td>
+                <select name="tileImageSrc"
+                        onchange="console.log(this.name + ': ' + this.value); board.tileImageSrc(this.value);" >
+                    <option value="zen_tile.png">circles & squares</option>
+                    <option value="zen_tile2.png">rounded</option>
+                </select>
+            </td>
+        </tr>
+
     </table>
     <br/>
 </div>
