@@ -14,9 +14,15 @@
     <script type="text/javascript" src="snabbt.min.js"></script>
 
     <style type="text/css">
+        .center {
+            margin: auto;
+            width: 50%;
+        }
+
         body {
             background-color: black;
             color: white;
+            height: 100%;
         }
 
         #zencontrol {
@@ -24,16 +30,19 @@
         }
 
         .zenframe {
+            /*
+            TODO vert center
+            */
             background-color: black;
-            float: left;
-            position:relative;
         }
 
         .zenboard {
-            /*
-            TODO horz and vert center
-            */
             background-color: black;
+
+            /* preserve pixels to prevent blur when transforming - not sure if actually a problem */
+            -webkit-transform-style: preserve-3d;
+            -moz-transform-style: preserve-3d;
+            transform-style: preserve-3d;
         }
 
         .tile {
@@ -182,7 +191,7 @@
     <br/>
 </div>
 
-<div id="zenframe" class="zenframe">
+<div id="zenframe" class="zenframe center">
 
     <div id="zenboard" class="zenboard">
         <img id="tile00" class="tile row0 col0 groupF" src="zen_tile.png">

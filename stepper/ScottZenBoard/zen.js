@@ -60,7 +60,13 @@ function rotateTiles(id, byRads, duration) {
 
         snabbt($(this), {
             rotation: [0, 0, target],
-            easing: 'ease',
+//            easing: 'ease',
+//            easing: 'easeIn',
+//            easing: 'easeOut',
+            easing: 'spring',
+            springConstant: 1.0,
+            springDeceleration: 0.5,
+//            springMass: 10.0,
             duration: duration || 500
         });
 
