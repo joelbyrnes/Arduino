@@ -1,4 +1,11 @@
+#include "FastSPI_LED2.h"
 #include "cie1931.h"   // https://jared.geek.nz/2013/feb/linear-led-pwm
+
+#define CONTROL_PIN 11
+
+#define NUM_LEDS 1
+
+struct CRGB leds[NUM_LEDS];
 
 int ledPin = 13;
 int analogPin = 0;     // voltage-divider circuit attached to analog pin 0
@@ -19,10 +26,20 @@ int pulseDir = 1;
 
 void setup() {
   Serial.begin(57600);             // Setup serial
-  digitalWrite(13, LOW);         // init off
+  digitalWrite(ledPin, LOW);         // init off
   pinMode(pwmPin, OUTPUT);
   pinMode(pulsePin, OUTPUT);
   analogWrite(pulsePin, pulseValue);
+  
+  LEDS.setBrightness(64);
+
+  LEDS.addLeds<WS2811, CONTROL_PIN, GRB>(leds, NUM_LEDS);
+   
+  LEDS.clear();
+  
+  // load with nice blue
+  LEDS.showColor(CRGB(0, 8, 16));
+  
 }
 
 void loop() {
@@ -51,6 +68,8 @@ void loop() {
   corrected = cie[constrain(ledValue, 0, 255)]; // values are constrained to ensure it is in map, plus will not turn off outside range
   
   analogWrite(pwmPin, corrected);  
+  
+  LEDS.showColor(CRGB(0, corrected, 0));
   
   if (millis() > time + 100) {
     time = millis(); 
