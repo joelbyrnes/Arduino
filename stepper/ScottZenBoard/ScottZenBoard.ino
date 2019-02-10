@@ -49,6 +49,8 @@ TO DO:
 #define motorPinF3  41    
 #define motorPinF4  39   
 
+#define PAUSE_PIN    8
+
 // Initialize with pin sequence IN1-IN3-IN2-IN4 for using the AccelStepper with 28BYJ-48
 // HALF4WIRE or FULL4WIRE
 AccelStepper stepperA(AccelStepper::HALF4WIRE, motorPinA1, motorPinA3, motorPinA2, motorPinA4);
@@ -63,7 +65,9 @@ AccelStepper stepperF(AccelStepper::HALF4WIRE, motorPinF1, motorPinF3, motorPinF
 // according to http://42bots.com/tutorials/28byj-48-stepper-motor-with-uln2003-driver-and-arduino-uno/ 
 // this motor isn't quite 4096 steps, more like 4076. 1019 per 90 degrees.
 
-#define MAX_SPEED  1200.0     // steps per second
+#define MAX_SPEED  1400.0     // steps per second
+#define ACCEL 5000.0
+#define SPEED 1400.0
 int stepsPer90Degrees = 1019;
 
 const int lightThreshold = 100;
@@ -98,7 +102,7 @@ StepperCluster clusterF { &stepperF, {8, 3, 4, 5, 6, 7, 8}, 0, SEQ_F, A6, 13, 0,
 StepperCluster *clusters[NUM_STEPPERS] = {&clusterA, &clusterB, &clusterC, &clusterD, &clusterE, &clusterF}; 
 
 // the time between sequence steps, in seconds.
-int timeFactor = 6;
+int timeFactor = 4;
 
 // reverse direction after this many cycles
 #define CYCLE_REVERSE_COUNT 25
@@ -117,8 +121,8 @@ void setup() {
 
     // configure steppers
     clusters[i]->stepper->setMaxSpeed(MAX_SPEED);
-    clusters[i]->stepper->setAcceleration(800.0);
-    clusters[i]->stepper->setSpeed(400);  
+    clusters[i]->stepper->setAcceleration(ACCEL);
+    clusters[i]->stepper->setSpeed(SPEED);  
     // start off disabled 
     clusters[i]->stepper->disableOutputs();
     
@@ -134,9 +138,15 @@ void setup() {
   }
 }
 
+boolean paused() {
+  // paused when connected to ground, otherwise floating 
+  return analogRead(PAUSE_PIN) == 0;
+}
+
 void loop() {
   ms = millis();
   
+  /* for homing which is not currently used
   for (int i=0; i < NUM_STEPPERS; i++) {
     int lightValue = analogRead(clusters[i]->sensorPin);
   
@@ -149,9 +159,10 @@ void loop() {
       clusters[i]->found = 0;
     }
   }
-
+  */
+  
   doWhatNow();
-
+  
   stepperA.run();
   stepperB.run();
   stepperC.run();
@@ -163,6 +174,13 @@ void loop() {
 void schedule(struct StepperCluster &cluster) {
   // schedule again according to sequence
   scheduler.timer(cluster.task, cluster.sequence[cluster.seqPos % 7] * timeFactor * 10);
+
+  Serial.print("paused = ");
+  Serial.println(paused());
+
+  // don't make movements if pause button on; pattern will proceed but without movement. 
+  if (paused()) return;
+
   cluster.seqPos++;
   cluster.stepper->enableOutputs();
   cluster.stepper->setMaxSpeed(MAX_SPEED);
