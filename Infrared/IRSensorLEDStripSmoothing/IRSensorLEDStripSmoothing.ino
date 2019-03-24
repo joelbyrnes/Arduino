@@ -1,149 +1,126 @@
-// this version uses MIDI so it requires the hardware serial, so no debugging on arduino pro
+// read analog input from Sharp gp2y0a51sk positional sensor and drive addressible RGB LED strip 
 
 #include "FastLED.h"
+#include "cie1931.h"   // https://jared.geek.nz/2013/feb/linear-led-pwm
 
+#define SENSOR_PIN A0
 #define CONTROL_PIN 11
+#define NUM_LEDS 50
+#define LED_BRIGHTNESS 255 // max 255
+// saturation (HSL) goes to 100% beyond this LED value (8-bit) 
+#define FULL_SAT_THRESHOLD 127
 
-#define NUM_LEDS 170
+#define LED_INTERVAL 30
+#define DEBUG_INTERVAL 100  // 0 to disable
 
 CRGB leds[NUM_LEDS];
 
-struct Input {
-  unsigned int inputPin;    // voltage-divider circuit attached to analog pin X
-  unsigned int pwmPin;      // pin to output PWM on
-  unsigned int raw;         // analog value read 
-  
-  unsigned int note;        // MIDI note value in hex eg middle C == 0x48
-  unsigned int velocity;    // track whether note is off
-}; 
-
-Input inputA { A0, 3, 0, 0x39, 0 }; // A
-
-#define NUM_INPUTS 1
-Input *inputs[NUM_INPUTS] = { &inputA }; 
-
-// TODO use define for pins
-
-unsigned long time = 0;         
-unsigned int ledValue = 0;
-unsigned int avg = 0;
-unsigned int corrected = 0;
+// starting values for analog input, which range to include values seen over time
+// min reading is lowest when an object is at the far extent of the range, otherwise it floats higher. 
+// tends to increase brightness over time because min goes lower than ambient reading. maybe 
+unsigned int rawMin = 160;
+unsigned int rawMax = 400;
 
 unsigned int raw = 0;
-unsigned int rawMin = 400;
-unsigned int rawMax = 600;
+unsigned int avg = 0;
+uint8_t ledValue = 0;
+uint8_t hue = 0;   // hue is automatically rotated to give rainbow effect
 
+unsigned long time = 0;
 unsigned long ledTime = 0;
-unsigned int ledInterval = 22;
-
-uint8_t hue = 0;
+unsigned long debugTime = 0;         
 
 // Define the number of samples to keep track of.  The higher the number,
 // the more the readings will be smoothed, but the slower the output will
 // respond to the input.  Using a constant rather than a normal variable lets
 // use this value to determine the size of the readings array.
-#define NUM_SAMPLES 2
+#define NUM_SAMPLES 128
 
 unsigned int h_readings[NUM_SAMPLES];      // the readings from the analog input
 unsigned int h_index = 0;                  // the index of the current reading
 unsigned int h_total = 0;                  // the running total
 
 void setup() {
-  Serial.begin(57600);      
-//  FastLED.setBrightness(128);
+  FastLED.setBrightness(LED_BRIGHTNESS);
   FastLED.addLeds<WS2811, CONTROL_PIN, GRB>(leds, NUM_LEDS);
   FastLED.clear();
   fill_solid(leds, 5, CRGB(50,0,200)); 
   FastLED.show();
-  
-  // initialise array to avoid wacky values
-  for (int i=0; i < NUM_SAMPLES; i++) {
-    h_readings[h_index++] = analogRead(inputs[0]->inputPin);
-//    h_readings[h_index++] = 150;
-    h_total += h_readings[h_index-1];
-  }
-  h_index = 0;
-  
+
+  Serial.begin(57600);      
   Serial.println();   
+  Serial.print(NUM_LEDS);   
+  Serial.print(" LEDS; ");
   debugLog();
-  Serial.println(h_readings[0]);   
-  Serial.println(h_readings[1]);   
-  Serial.println(h_readings[2]);   
-  Serial.println(h_total);   
   Serial.println("--- starting ---");   
+  
+}
+
+unsigned int getSmoothedInput(unsigned int raw) {
+    // subtract the oldest reading:
+  h_total = h_total - h_readings[h_index];         
+  // read from the sensor:  
+  h_readings[h_index] = raw; 
+  // add the reading to the total:
+  h_total = h_total + h_readings[h_index++];       
+  // if we're at the end of the array, restart
+  if (h_index >= NUM_SAMPLES) h_index = 0;                           
+  return h_total / NUM_SAMPLES;
 }
 
 void loop() {
-  // read all analog inputs at once
-  for (int i=0; i < NUM_INPUTS; i++) {
-    raw = analogRead(inputs[i]->inputPin);
-    // smooth input
-    
-    // subtract the last reading:
-    h_total = h_total - h_readings[h_index];         
-    // read from the sensor:  
-    h_readings[h_index] = raw; 
-    // add the reading to the total:
-    h_total = h_total + h_readings[h_index++];       
+  // read the sensor every loop and smooth the value (sometimes spikes) 
   
-    // if we're at the end of the array, restart
-    if (h_index >= NUM_SAMPLES) h_index = 0;                           
+  raw = analogRead(SENSOR_PIN);
+  if (raw < rawMin) rawMin = raw;
+  if (raw > rawMax) rawMax = raw;   // never decrease? maybe over time? 
+
+  avg = getSmoothedInput(raw);
   
-    // calculate the average:
-    inputs[i]->raw = h_total / NUM_SAMPLES;
+  // map auto-correlated to input range and mapped to 8 bits
+  ledValue = map(raw, rawMin, rawMax, 0, 255);
+  //corrected = cie[constrain(ledValue, 0, 255)]; // values are constrained to ensure it is in map, plus will not turn off outside range
+  
+  time = millis();
+  // every once in a while push a new value onto the strip 
+  if (time > ledTime + LED_INTERVAL) {
+    ledTime = time; 
     
-    //inputs[i]->raw = raw;
-    if (inputs[i]->raw < rawMin) rawMin = inputs[i]->raw;
-    if (inputs[i]->raw > rawMax) rawMax = inputs[i]->raw;   // never decrease? maybe over time? 
+    // push array along by 1, and set the new value to the 1st 
+    memmove8(&leds[1], &leds[0], (NUM_LEDS - 1) * sizeof(struct CRGB));
+    //leds[0].setRGB(0, corrected, 0);
+    
+    // make saturation dull up to a threshold then full colour
+    uint8_t sat = 0;
+    if (ledValue > FULL_SAT_THRESHOLD) sat = 255;
+    else sat = map(ledValue, 0, FULL_SAT_THRESHOLD, 0, 255);
+    
+    hue = hue + 1;
+    leds[0].setHSV(hue, sat, ledValue);
+    if (hue>255) hue = 0;
+    FastLED.show();
   }
   
-  // process inputs
-  for (int i=0; i < NUM_INPUTS; i++) {
-    ledValue = map(inputs[i]->raw, rawMin, rawMax, 0, 255);
-    //avg = int(float(avg) * 0.99 + float(ledValue) * 0.01);
-    corrected = constrain(ledValue, 0, 255); // values are constrained to ensure it is in map, plus will not turn off outside range
-    
-    analogWrite(inputs[i]->pwmPin, corrected);  
-    
-    if (millis() > ledTime + ledInterval) {
-      ledTime = millis(); 
-      
-      if (1) { // ledValue >= 10
-        // push array along by 1, and set the new value to the 1st 
-        memmove8(&leds[1], &leds[0], (NUM_LEDS - 1) * sizeof(struct CRGB));
-        //leds[0].setRGB(0, corrected, 0);
-        
-        // make saturation dull up to a threshold then full colour
-        uint8_t sat = 0;
-        if (corrected > 127) sat = 255;
-        else sat = map(corrected, 0, 127, 0, 255);
-        
-        leds[0].setHSV( hue++, sat, corrected);
-        if (hue>255) hue = 0;
-        FastLED.show();
-      }
-    }
-  }
-  
-  if (millis() > time + 100) {
-    time = millis(); 
+  if (DEBUG_INTERVAL && time > debugTime + DEBUG_INTERVAL) {
+    debugTime = time; 
     debugLog();
   }
 }
 
 void debugLog() {
-  Serial.print("raw: ");    
+  Serial.print(time);  
+  Serial.print(": raw: ");    
   Serial.print(raw);  
-  Serial.print(" - Value: ");    
-  Serial.print(inputs[0]->raw);  
+  Serial.print(" - avg: ");    
+  Serial.print(avg);  
   Serial.print(" - min: ");    
   Serial.print(rawMin);  
   Serial.print(" - max: ");    
   Serial.print(rawMax);  
   Serial.print(" - LED: ");    
   Serial.print(ledValue);  
-  Serial.print(" - corrected: ");    
-  Serial.print(corrected);  
+//  Serial.print(" - corrected: ");    
+//  Serial.print(corrected);  
   Serial.println(""); 
 }
 
