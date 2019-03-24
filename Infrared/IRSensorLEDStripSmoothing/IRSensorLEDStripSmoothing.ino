@@ -2,6 +2,7 @@
 
 #include "FastLED.h"
 #include "cie1931.h"   // https://jared.geek.nz/2013/feb/linear-led-pwm
+#include <JeeLib.h>    // Scheduler
 
 #define SENSOR_PIN A0
 #define CONTROL_PIN 11
@@ -10,10 +11,13 @@
 // saturation (HSL) goes to 100% beyond this LED value (8-bit) 
 #define FULL_SAT_THRESHOLD 127
 
+#define READ_INTERVAL 4
 #define LED_INTERVAL 30
 #define DEBUG_INTERVAL 100  // 0 to disable
 
 CRGB leds[NUM_LEDS];
+
+MilliTimer debugTimer, readTimer, writeTimer;
 
 // starting values for analog input, which range to include values seen over time
 // min reading is lowest when an object is at the far extent of the range, otherwise it floats higher. 
@@ -27,14 +31,12 @@ uint8_t ledValue = 0;
 uint8_t hue = 0;   // hue is automatically rotated to give rainbow effect
 
 unsigned long time = 0;
-unsigned long ledTime = 0;
-unsigned long debugTime = 0;         
 
 // Define the number of samples to keep track of.  The higher the number,
 // the more the readings will be smoothed, but the slower the output will
 // respond to the input.  Using a constant rather than a normal variable lets
 // use this value to determine the size of the readings array.
-#define NUM_SAMPLES 128
+#define NUM_SAMPLES 4
 
 unsigned int h_readings[NUM_SAMPLES];      // the readings from the analog input
 unsigned int h_index = 0;                  // the index of the current reading
@@ -51,13 +53,12 @@ void setup() {
   Serial.println();   
   Serial.print(NUM_LEDS);   
   Serial.print(" LEDS; ");
-  debugLog();
+  debugLog(millis());
   Serial.println("--- starting ---");   
-  
 }
 
 unsigned int getSmoothedInput(unsigned int raw) {
-    // subtract the oldest reading:
+  // subtract the oldest reading:
   h_total = h_total - h_readings[h_index];         
   // read from the sensor:  
   h_readings[h_index] = raw; 
@@ -69,23 +70,21 @@ unsigned int getSmoothedInput(unsigned int raw) {
 }
 
 void loop() {
-  // read the sensor every loop and smooth the value (sometimes spikes) 
+  // read the sensor and smooth the value (sometimes spikes) 
+  if (readTimer.poll(READ_INTERVAL)) {
+    raw = analogRead(SENSOR_PIN);
+    if (raw < rawMin) rawMin = raw;
+    if (raw > rawMax) rawMax = raw;   // never decrease? maybe over time? 
   
-  raw = analogRead(SENSOR_PIN);
-  if (raw < rawMin) rawMin = raw;
-  if (raw > rawMax) rawMax = raw;   // never decrease? maybe over time? 
-
-  avg = getSmoothedInput(raw);
-  
-  // map auto-correlated to input range and mapped to 8 bits
-  ledValue = map(raw, rawMin, rawMax, 0, 255);
-  //corrected = cie[constrain(ledValue, 0, 255)]; // values are constrained to ensure it is in map, plus will not turn off outside range
-  
-  time = millis();
-  // every once in a while push a new value onto the strip 
-  if (time > ledTime + LED_INTERVAL) {
-    ledTime = time; 
+    avg = getSmoothedInput(raw);
     
+    // map auto-correlated to input range and mapped to 8 bits
+    ledValue = map(avg, rawMin, rawMax, 0, 255);
+    //corrected = cie[constrain(ledValue, 0, 255)]; // values are constrained to ensure it is in map, plus will not turn off outside range
+  }
+  
+  // every once in a while push a new value onto the strip 
+  if (writeTimer.poll(LED_INTERVAL)) {
     // push array along by 1, and set the new value to the 1st 
     memmove8(&leds[1], &leds[0], (NUM_LEDS - 1) * sizeof(struct CRGB));
     //leds[0].setRGB(0, corrected, 0);
@@ -101,15 +100,15 @@ void loop() {
     FastLED.show();
   }
   
-  if (DEBUG_INTERVAL && time > debugTime + DEBUG_INTERVAL) {
-    debugTime = time; 
-    debugLog();
+  if (debugTimer.poll(DEBUG_INTERVAL)) {
+    debugLog(millis());
   }
 }
 
-void debugLog() {
-  Serial.print(time);  
-  Serial.print(": raw: ");    
+void debugLog(unsigned int timestamp) {
+  Serial.print("[");    
+  Serial.print(timestamp);  
+  Serial.print("ms] raw: ");    
   Serial.print(raw);  
   Serial.print(" - avg: ");    
   Serial.print(avg);  
