@@ -11,7 +11,7 @@
 // saturation (HSL) goes to 100% beyond this LED value (8-bit) 
 #define FULL_SAT_THRESHOLD 127
 
-#define READ_INTERVAL 4
+#define READ_INTERVAL 1
 #define LED_INTERVAL 30
 #define DEBUG_INTERVAL 100  // 0 to disable
 
@@ -36,7 +36,7 @@ unsigned long time = 0;
 // the more the readings will be smoothed, but the slower the output will
 // respond to the input.  Using a constant rather than a normal variable lets
 // use this value to determine the size of the readings array.
-#define NUM_SAMPLES 4
+#define NUM_SAMPLES 32
 
 unsigned int h_readings[NUM_SAMPLES];      // the readings from the analog input
 unsigned int h_index = 0;                  // the index of the current reading
@@ -78,7 +78,7 @@ void loop() {
   
     avg = getSmoothedInput(raw);
     
-    // map auto-correlated to input range and mapped to 8 bits
+    // map auto-correlated to input range and reduce to 8 bits
     ledValue = map(avg, rawMin, rawMax, 0, 255);
     //corrected = cie[constrain(ledValue, 0, 255)]; // values are constrained to ensure it is in map, plus will not turn off outside range
   }
