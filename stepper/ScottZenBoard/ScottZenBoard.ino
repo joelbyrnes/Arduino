@@ -9,10 +9,6 @@ E :  7   8   3   4   5   6   7   (repeat)   40
 F :  8   3   4   5   6   7   8   (repeat)   41 
 
 Move 90 degrees after x seconds/minutes. 
-
-TO DO:
-* pause switch so boards can be fixed up
-
 */
 
 #include <AccelStepper.h>
